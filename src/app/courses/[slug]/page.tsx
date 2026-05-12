@@ -24,11 +24,11 @@ export default async function CourseDetailPage({
 
   const { data: lessons } = await supabase
     .from('lessons')
-    .select('id, title, position, is_published')
+    .select('id, slug, title, position, is_published')
     .eq('course_id', course.id)
     .eq('is_published', true)
     .order('position', { ascending: true })
-    .returns<Pick<Lesson, 'id' | 'title' | 'position' | 'is_published'>[]>()
+    .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'is_published'>[]>()
 
   // Check if the current user is enrolled
   let isEnrolled = false
@@ -108,7 +108,7 @@ export default async function CourseDetailPage({
         )}
 
         {clerkUser && canAccess && lessons?.length ? (
-          <Link href={`/courses/${slug}/lessons/${lessons[0].id}`}>
+          <Link href={lessons[0].slug ? `/courses/${slug}/lessons/${lessons[0].slug}` : `/courses/${slug}/lessons/${lessons[0].id}`}>
             <button style={btnStyle}>
               {isEnrolled ? 'Continue learning →' : 'Start learning →'}
             </button>
@@ -129,7 +129,7 @@ export default async function CourseDetailPage({
             <li key={lesson.id}>
               {canAccess ? (
                 <Link
-                  href={`/courses/${slug}/lessons/${lesson.id}`}
+                  href={lesson.slug ? `/courses/${slug}/lessons/${lesson.slug}` : `/courses/${slug}/lessons/${lesson.id}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <div style={lessonRowStyle(true)}>

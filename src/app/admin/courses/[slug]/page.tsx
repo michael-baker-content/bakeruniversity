@@ -109,12 +109,12 @@ export default async function AdminCourseBySlugPage({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <Link href={`/admin/courses/${slug}/lessons/${lesson.id}`}>
+                <Link href={`/admin/courses/${slug}/lessons/${lesson.slug ?? lesson.id}`}>
                   <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
                     Edit
                   </button>
                 </Link>
-                <Link href={`/courses/${course.slug}/lessons/${lesson.id}`} target="_blank">
+                <Link href={lesson.slug ? `/courses/${course.slug}/lessons/${lesson.slug}` : `/courses/${course.slug}/lessons/${lesson.id}`} target="_blank">
                   <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
                     Preview ↗
                   </button>

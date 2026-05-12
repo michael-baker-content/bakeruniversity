@@ -46,6 +46,10 @@ export interface Lesson {
   content: Record<string, unknown> | null  // TipTap JSON
   position: number
   youtube_url: string | null
+  slides_url: string | null
+  slides_meta: { title?: string; filename?: string; description?: string } | null
+  introduction: string | null
+  slug: string | null
   is_published: boolean
   created_at: string
   updated_at: string

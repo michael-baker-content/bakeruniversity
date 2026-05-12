@@ -1,6 +1,6 @@
 # Bakerversity
 
-A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Supports rich lesson content with LaTeX math rendering, quizzes, instructor grading, and certificates.
+A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Supports rich lesson content with LaTeX math rendering, quizzes with per-option explanations, instructor grading, PDF/Google Slides embedding, and certificates.
 
 ---
 
@@ -60,16 +60,25 @@ Use the ngrok HTTPS URL as your webhook endpoint. Add it to **Authorized JavaScr
 ### 4. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com)
-   - Uncheck **Automatically expose new tables** at creation
+   - Uncheck **Automatically expose new tables** at project creation
    - Enable **Automatic RLS**
-2. Run `supabase/schema.sql` in the SQL editor (Dashboard → SQL Editor → paste the file contents → Run)
+2. Run `supabase/schema.sql` in the SQL editor (Dashboard → SQL Editor → paste → Run)
 3. Copy keys from **Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - anon/public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - service_role key → `SUPABASE_SERVICE_ROLE_KEY`
-4. Create a storage bucket named `lesson-images` (public) with these policies:
-   - `SELECT` for `public`
-   - `INSERT`, `DELETE` for `authenticated`
+4. Create two storage buckets:
+
+   **lesson-images** (public)
+   - File size limit: 5MB
+   - Allowed MIME types: `image/jpeg, image/png, image/gif, image/webp`
+   - Policies: SELECT for public · INSERT + DELETE for authenticated
+
+   **lesson-slides** (public)
+   - File size limit: 50MB
+   - Allowed MIME types: `application/pdf`
+   - Policies: SELECT for public · INSERT + DELETE for authenticated
+
 5. Enable SSL: **Database → Settings → SSL Configuration**
 
 ---
@@ -105,6 +114,18 @@ After signing up, go to Supabase → Table Editor → `users`, find your row, an
 
 ---
 
+### 9. Generate lesson slugs (existing installations only)
+
+If you added the `slug` column to an existing database, run this in your browser console while signed in as an instructor to backfill slugs for all existing lessons:
+
+```js
+fetch('/api/admin/migrate-lesson-slugs', { method: 'POST' })
+  .then(r => r.json())
+  .then(console.log)
+```
+
+---
+
 ## Project structure
 
 ```
@@ -118,15 +139,17 @@ src/
 │   │   │       ├── page.tsx             # Course detail + lesson list
 │   │   │       └── lessons/
 │   │   │           ├── new/page.tsx     # Create lesson
-│   │   │           └── [lessonId]/      # Edit lesson + quiz editor
+│   │   │           └── [lessonId]/      # Edit lesson + quiz editor + slides
 │   │   └── grading/page.tsx             # Review student text responses
 │   ├── api/
 │   │   ├── admin/
 │   │   │   ├── courses/                 # Course + lesson CRUD
 │   │   │   ├── course-id-by-slug/       # Slug → UUID resolver
 │   │   │   ├── grading/                 # Fetch responses + save feedback
+│   │   │   ├── migrate-lesson-slugs/    # One-time slug backfill endpoint
 │   │   │   ├── parse-markdown/          # Markdown → TipTap JSON
-│   │   │   └── upload/                  # Image upload to Supabase Storage
+│   │   │   ├── upload/                  # Image upload to Supabase Storage
+│   │   │   └── upload-slides/           # PDF upload to Supabase Storage
 │   │   ├── lessons/[lessonId]/quiz/     # Student quiz submission
 │   │   ├── students/quiz-feedback/      # Fetch instructor feedback
 │   │   └── webhooks/
@@ -136,7 +159,7 @@ src/
 │   │   ├── page.tsx                     # Public course catalogue
 │   │   └── [slug]/
 │   │       ├── page.tsx                 # Course detail + enroll
-│   │       └── lessons/[lessonId]/      # Lesson viewer + quiz
+│   │       └── lessons/[lessonSlug]/    # Lesson viewer (slug or UUID)
 │   ├── dashboard/page.tsx               # Student + instructor dashboard
 │   └── sign-in / sign-up               # Clerk auth pages
 ├── components/
@@ -145,12 +168,30 @@ src/
 │   ├── QuizEditor.tsx                   # Admin quiz builder
 │   ├── QuizTaker.tsx                    # Student quiz UI
 │   ├── LatexModal.tsx                   # Algebra 1 LaTeX formula picker
-│   └── MarkdownImport.tsx               # Import .md/.mdx files into editor
+│   ├── MarkdownImport.tsx               # Import .md/.mdx files into editor
+│   ├── SlidesSection.tsx                # Client boundary for slides viewer
+│   └── SlidesViewer.tsx                 # PDF iframe + Google Slides embed
 └── lib/
     ├── supabase.ts                       # Browser, server, service role clients
     ├── types.ts                          # TypeScript types matching DB schema
     └── markdownToTipTap.ts              # Markdown AST → TipTap JSON converter
 ```
+
+---
+
+## URL structure
+
+| Route | Description |
+|---|---|
+| `/courses` | Public course catalogue |
+| `/courses/[courseSlug]` | Course detail + lesson list |
+| `/courses/[courseSlug]/lessons/[lessonSlug]` | Lesson viewer |
+| `/admin/courses` | Instructor course list |
+| `/admin/courses/[courseSlug]` | Course editor + lesson list |
+| `/admin/courses/[courseSlug]/lessons/new` | Create lesson |
+| `/admin/courses/[courseSlug]/lessons/[lessonId]` | Edit lesson |
+| `/admin/grading` | Student response grading |
+| `/dashboard` | Student + instructor dashboard |
 
 ---
 
@@ -161,30 +202,37 @@ src/
 | Auth (Clerk + Google OAuth) | ✅ Complete |
 | User sync (Clerk → Supabase) | ✅ Complete |
 | Course + lesson CRUD | ✅ Complete |
+| Slug-based URLs (courses + lessons) | ✅ Complete |
 | Rich text editor with KaTeX | ✅ Complete |
+| LaTeX formula modal (Algebra 1) | ✅ Complete |
 | Image upload (Supabase Storage) | ✅ Complete |
 | Markdown import (.md, .mdx) | ✅ Complete |
-| LaTeX formula modal | ✅ Complete |
+| PDF slideshow viewer | ✅ Complete |
+| Google Slides embed | ✅ Complete |
+| Lesson introduction text | ✅ Complete |
 | Course catalogue + lesson viewer | ✅ Complete |
-| Quiz engine (MC, T/F, text) | ✅ Complete |
+| Quiz engine (MC, T/F, text response) | ✅ Complete |
 | Per-option explanations | ✅ Complete |
 | Instructor grading view | ✅ Complete |
 | Student feedback display | ✅ Complete |
 | Responsive design | 🔲 Planned |
 | Visual design polish | 🔲 Planned |
 | Certificates | 🔲 Planned |
-| PDF slideshow viewer | 🔲 Planned |
-| Onboarding + email | 🔲 Planned |
+| Onboarding + email (Resend) | 🔲 Planned |
 | Stripe payments | 🔲 Planned |
 
 ---
 
 ## PowerShell note
 
-When deleting folders with brackets in the name (e.g. `[courseId]`), use `-LiteralPath`:
+When deleting folders with brackets in the name (e.g. `[courseId]`), PowerShell's `-Path` flag treats brackets as wildcards and silently fails. Always use `-LiteralPath`:
 
 ```powershell
 Remove-Item -Recurse -Force -LiteralPath "src\app\admin\courses\[courseId]"
 ```
 
-The standard `-Path` flag treats brackets as wildcards and silently fails.
+---
+
+## Schema migrations
+
+The `supabase/schema.sql` file contains the full schema. If you have an existing installation, see the **MIGRATIONS** section at the bottom of that file for `ALTER TABLE` statements to run for columns added after the initial schema.
