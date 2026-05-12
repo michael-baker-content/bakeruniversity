@@ -1,0 +1,42 @@
+{
+  "name": "course-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tiptap/core": "^2.7.0",
+    "@tiptap/extension-code-block-lowlight": "^2.7.0",
+    "@tiptap/extension-image": "^2.27.2",
+    "@tiptap/pm": "^2.7.0",
+    "@tiptap/react": "^2.7.0",
+    "@tiptap/starter-kit": "^2.7.0",
+    "katex": "^0.16.11",
+    "lowlight": "^3.1.0",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "resend": "^4.0.0",
+    "stripe": "^17.0.0",
+    "svix": "^1.24.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.7",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^8",
+    "eslint-config-next": "^15.3.0",
+    "typescript": "^5"
+  }
+}
