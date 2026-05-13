@@ -3,9 +3,16 @@ import { currentUser } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import LessonRenderer from '@/components/LessonRenderer'
+import LessonSidebar from '@/components/LessonSidebar'
 import QuizTaker from '@/components/QuizTaker'
 import SlidesSection from '@/components/SlidesSection'
 import type { Course, Lesson, User } from '@/lib/types'
+
+interface Module {
+  id: string
+  title: string
+  position: number
+}
 
 export default async function LessonViewerPage({
   params,
@@ -72,11 +79,31 @@ export default async function LessonViewerPage({
   // Get all published lessons for the sidebar
   const { data: allLessons } = await supabase
     .from('lessons')
-    .select('id, slug, title, position')
+    .select('id, slug, title, position, module_id')
     .eq('course_id', course.id)
     .eq('is_published', true)
     .order('position', { ascending: true })
-    .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position'>[]>()
+    .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>()
+
+  // Get modules for sidebar grouping
+  const { data: modules } = await supabase
+    .from('modules')
+    .select('id, title, position')
+    .eq('course_id', course.id)
+    .order('position', { ascending: true })
+    .returns<Module[]>()
+
+  // Get published course pages for sidebar
+  const { data: coursePages } = await supabase
+    .from('course_pages')
+    .select('id, slug, title, page_type, position')
+    .eq('course_id', course.id)
+    .eq('is_published', true)
+    .order('position', { ascending: true })
+
+  const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
+  const beforePages = (coursePages ?? []).filter((p) => beforeTypes.includes(p.page_type))
+  const afterPages = (coursePages ?? []).filter((p) => !beforeTypes.includes(p.page_type))
 
   const currentIndex = allLessons?.findIndex((l) => l.slug === lessonSlug || l.id === lesson.id) ?? 0
   const prevLesson = allLessons?.[currentIndex - 1]
@@ -88,45 +115,20 @@ export default async function LessonViewerPage({
       : `/courses/${slug}/lessons/${l.id}`
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: 260,
-        borderRight: '1px solid #eee',
-        padding: '1.5rem 0',
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        overflowY: 'auto',
-        flexShrink: 0,
-      }}>
-        <div style={{ padding: '0 1rem 1rem', borderBottom: '1px solid #eee', marginBottom: '0.5rem' }}>
-          <Link href={`/courses/${slug}`} style={{ fontSize: 13, color: '#666' }}>← {course.title}</Link>
-        </div>
-        <nav>
-          {allLessons?.map((l, index) => (
-            <Link key={l.id} href={lessonHref(l)} style={{ textDecoration: 'none' }}>
-              <div style={{
-                padding: '8px 1rem',
-                fontSize: 13,
-                background: l.slug === lessonSlug || l.id === lesson.id ? '#f0f0f0' : 'transparent',
-                fontWeight: l.slug === lessonSlug || l.id === lesson.id ? 500 : 400,
-                color: l.slug === lessonSlug || l.id === lesson.id ? '#111' : '#444',
-                borderLeft: l.slug === lessonSlug || l.id === lesson.id ? '3px solid #111' : '3px solid transparent',
-                display: 'flex',
-                gap: 8,
-                alignItems: 'flex-start',
-              }}>
-                <span style={{ color: '#aaa', minWidth: 20, fontSize: 12, paddingTop: 1 }}>{index + 1}</span>
-                <span style={{ lineHeight: 1.4 }}>{l.title}</span>
-              </div>
-            </Link>
-          ))}
-        </nav>
-      </aside>
+    <div className="lesson-viewer-layout">
+      <LessonSidebar
+        courseSlug={slug}
+        courseTitle={course.title}
+        lessons={allLessons ?? []}
+        modules={modules ?? []}
+        beforePages={beforePages}
+        afterPages={afterPages}
+        currentLessonId={lesson.id}
+        currentLessonSlug={lesson.slug ?? null}
+      />
 
       {/* Main content */}
-      <main style={{ flex: 1, padding: '2rem 3rem', maxWidth: 780, margin: '0 auto' }}>
+      <main className="lesson-main">
         <h1 style={{ margin: '0 0 0.75rem', fontSize: '1.75rem' }}>{lesson.title}</h1>
 
         {/* Introduction */}
@@ -200,6 +202,26 @@ export default async function LessonViewerPage({
             </Link>
           )}
         </div>
+      <style>{`
+        @media (min-width: 769px) {
+          div:has(> .lesson-sidebar-desktop) {
+            flex-direction: row;
+          }
+        }
+        .lesson-main {
+          flex: 1;
+          padding: 2rem 3rem;
+          max-width: 780px;
+          margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        @media (max-width: 768px) {
+          .lesson-main {
+            padding: 1.25rem 1rem;
+          }
+        }
+      `}</style>
       </main>
     </div>
   )

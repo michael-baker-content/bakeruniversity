@@ -140,16 +140,19 @@ src/
 │   │   │       └── lessons/
 │   │   │           ├── new/page.tsx     # Create lesson
 │   │   │           └── [lessonId]/      # Edit lesson + quiz editor + slides
-│   │   └── grading/page.tsx             # Review student text responses
+│   │   ├── grading/page.tsx             # Review student text responses
+│   │   └── courses/[slug]/pages/        # Create + edit course pages
 │   ├── api/
 │   │   ├── admin/
-│   │   │   ├── courses/                 # Course + lesson CRUD
-│   │   │   ├── course-id-by-slug/       # Slug → UUID resolver
+│   │   │   ├── courses/                 # Course + lesson + module + page CRUD
+│   │   │   ├── course-id-by-slug/       # Course slug → UUID resolver
+│   │   │   ├── lesson-id-by-slug/       # Lesson slug → UUID resolver
 │   │   │   ├── grading/                 # Fetch responses + save feedback
 │   │   │   ├── migrate-lesson-slugs/    # One-time slug backfill endpoint
 │   │   │   ├── parse-markdown/          # Markdown → TipTap JSON
 │   │   │   ├── upload/                  # Image upload to Supabase Storage
 │   │   │   └── upload-slides/           # PDF upload to Supabase Storage
+│   │   ├── course-pages/               # Student read/unread toggle
 │   │   ├── lessons/[lessonId]/quiz/     # Student quiz submission
 │   │   ├── students/quiz-feedback/      # Fetch instructor feedback
 │   │   └── webhooks/
@@ -158,17 +161,23 @@ src/
 │   ├── courses/
 │   │   ├── page.tsx                     # Public course catalogue
 │   │   └── [slug]/
-│   │       ├── page.tsx                 # Course detail + enroll
-│   │       └── lessons/[lessonSlug]/    # Lesson viewer (slug or UUID)
+│   │       ├── page.tsx                 # Course detail + full contents list
+│   │       ├── contents/page.tsx        # Standalone table of contents
+│   │       ├── lessons/[lessonSlug]/    # Lesson viewer (slug or UUID)
+│   │       └── pages/[pageSlug]/        # Course page viewer
 │   ├── dashboard/page.tsx               # Student + instructor dashboard
 │   └── sign-in / sign-up               # Clerk auth pages
 ├── components/
-│   ├── TipTapEditor.tsx                 # Rich text editor (KaTeX + code + images)
+│   ├── TipTapEditor.tsx                 # Configurable rich text editor (packs: math, code)
 │   ├── LessonRenderer.tsx               # Read-only lesson renderer
+│   ├── LessonSidebar.tsx                # Responsive sidebar with modules + course pages
+│   ├── LessonList.tsx                   # Reorderable lesson list with module assignment
+│   ├── ModuleManager.tsx                # Create/rename/reorder modules
 │   ├── QuizEditor.tsx                   # Admin quiz builder
 │   ├── QuizTaker.tsx                    # Student quiz UI
 │   ├── LatexModal.tsx                   # Algebra 1 LaTeX formula picker
 │   ├── MarkdownImport.tsx               # Import .md/.mdx files into editor
+│   ├── CoursePageReadToggle.tsx         # Student read/unread toggle for course pages
 │   ├── SlidesSection.tsx                # Client boundary for slides viewer
 │   └── SlidesViewer.tsx                 # PDF iframe + Google Slides embed
 └── lib/
@@ -184,12 +193,16 @@ src/
 | Route | Description |
 |---|---|
 | `/courses` | Public course catalogue |
-| `/courses/[courseSlug]` | Course detail + lesson list |
+| `/courses/[courseSlug]` | Course detail + full contents list |
+| `/courses/[courseSlug]/contents` | Standalone table of contents |
 | `/courses/[courseSlug]/lessons/[lessonSlug]` | Lesson viewer |
+| `/courses/[courseSlug]/pages/[pageSlug]` | Course page viewer |
 | `/admin/courses` | Instructor course list |
-| `/admin/courses/[courseSlug]` | Course editor + lesson list |
+| `/admin/courses/[courseSlug]` | Course editor + lessons + modules + pages |
 | `/admin/courses/[courseSlug]/lessons/new` | Create lesson |
 | `/admin/courses/[courseSlug]/lessons/[lessonId]` | Edit lesson |
+| `/admin/courses/[courseSlug]/pages/new` | Create course page |
+| `/admin/courses/[courseSlug]/pages/[pageId]` | Edit course page |
 | `/admin/grading` | Student response grading |
 | `/dashboard` | Student + instructor dashboard |
 
@@ -215,7 +228,13 @@ src/
 | Per-option explanations | ✅ Complete |
 | Instructor grading view | ✅ Complete |
 | Student feedback display | ✅ Complete |
-| Responsive design | 🔲 Planned |
+| Modules (lesson grouping) | ✅ Complete |
+| Course pages (overview, syllabus, etc.) | ✅ Complete |
+| Table of contents | ✅ Complete |
+| Student read/unread toggle | ✅ Complete |
+| Configurable editor packs (math, code) | ✅ Complete |
+| Responsive design (student-facing) | ✅ Complete |
+| Video infrastructure (table + storage) | ✅ Schema only |
 | Visual design polish | 🔲 Planned |
 | Certificates | 🔲 Planned |
 | Onboarding + email (Resend) | 🔲 Planned |
@@ -235,4 +254,11 @@ Remove-Item -Recurse -Force -LiteralPath "src\app\admin\courses\[courseId]"
 
 ## Schema migrations
 
-The `supabase/schema.sql` file contains the full schema. If you have an existing installation, see the **MIGRATIONS** section at the bottom of that file for `ALTER TABLE` statements to run for columns added after the initial schema.
+The `supabase/schema.sql` file contains the full initial schema. Additional migrations are in separate files:
+
+| File | Description |
+|---|---|
+| `supabase/schema.sql` | Initial schema — users, courses, lessons, quizzes, enrollments, certificates |
+| `supabase/migration_002_modules_pages_videos.sql` | Adds `course_pages`, `course_page_views`, `videos` tables |
+
+Run them in order when setting up a fresh installation. For existing installations, run only the migration files you haven't applied yet.

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { useEditor, EditorContent, Node, mergeAttributes } from '@tiptap/react'
+import { useEditor, EditorContent, Node, mergeAttributes, Extension } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
@@ -12,7 +12,7 @@ import 'katex/dist/katex.min.css'
 
 const lowlight = createLowlight(common)
 
-// ── Inline math node ($...$) ─────────────────────────────────────────────────
+// ── Math nodes ───────────────────────────────────────────────────────────────
 const InlineMath = Node.create({
   name: 'inlineMath',
   group: 'inline',
@@ -25,7 +25,6 @@ const InlineMath = Node.create({
   },
 })
 
-// ── Block math node ($$...$$) ────────────────────────────────────────────────
 const BlockMath = Node.create({
   name: 'blockMath',
   group: 'block',
@@ -37,10 +36,50 @@ const BlockMath = Node.create({
   },
 })
 
+// ── Math keyboard shortcut extension ─────────────────────────────────────────
+const MathShortcut = Extension.create({
+  name: 'mathShortcut',
+  addKeyboardShortcuts() {
+    const handleMath = () => {
+      const { state } = this.editor
+      const { from } = state.selection
+      const textBefore = state.doc.textBetween(Math.max(0, from - 200), from)
+
+      const blockMatch = textBefore.match(/\$\$([^$]+)\$\$$/)
+      if (blockMatch) {
+        this.editor.chain()
+          .deleteRange({ from: from - blockMatch[0].length, to: from })
+          .insertContent({ type: 'blockMath', attrs: { latex: blockMatch[1].trim() } })
+          .run()
+        return true
+      }
+
+      const inlineMatch = textBefore.match(/\$([^$]+)\$$/)
+      if (inlineMatch) {
+        this.editor.chain()
+          .deleteRange({ from: from - inlineMatch[0].length, to: from })
+          .insertContent({ type: 'inlineMath', attrs: { latex: inlineMatch[1].trim() } })
+          .run()
+        return true
+      }
+      return false
+    }
+    return {
+      Space: handleMath,
+      Enter: handleMath,
+    }
+  },
+})
+
+// ── Pack definitions ──────────────────────────────────────────────────────────
+export type EditorPack = 'math' | 'code'
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface TipTapEditorProps {
   content?: Record<string, unknown>
   onChange?: (content: Record<string, unknown>) => void
   editable?: boolean
+  packs?: EditorPack[]
   onEditorReady?: (insert: (doc: Record<string, unknown>) => void) => void
 }
 
@@ -48,6 +87,7 @@ export default function TipTapEditor({
   content,
   onChange,
   editable = true,
+  packs = ['math', 'code'],
   onEditorReady,
 }: TipTapEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
@@ -55,15 +95,20 @@ export default function TipTapEditor({
   const [uploading, setUploading] = useState(false)
   const [showLatexModal, setShowLatexModal] = useState(false)
 
-  // ── Editor instance ─────────────────────────────────────────────────────────
+  const hasMath = packs.includes('math')
+  const hasCode = packs.includes('code')
+
+  // ── Build extensions list based on packs ──────────────────────────────────
+  const extensions = [
+    StarterKit.configure({ codeBlock: false }),
+    Image.configure({ inline: false, allowBase64: false }),
+    ...(hasCode ? [CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'python' })] : []),
+    ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
+  ]
+
+  // ── Editor instance ───────────────────────────────────────────────────────
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'python' }),
-      Image.configure({ inline: false, allowBase64: false }),
-      InlineMath,
-      BlockMath,
-    ],
+    extensions,
     content: content ?? '',
     editable,
     onCreate: ({ editor }) => {
@@ -78,8 +123,7 @@ export default function TipTapEditor({
     },
   })
 
-  // ── Expose insert function to parent (for markdown import) ──────────────────
-  // Must be after useEditor so `editor` is defined
+  // ── Expose insert function for markdown import ────────────────────────────
   useEffect(() => {
     if (!editor || !onEditorReady) return
     onEditorReady((doc: Record<string, unknown>) => {
@@ -90,9 +134,9 @@ export default function TipTapEditor({
     })
   }, [editor, onEditorReady])
 
-  // ── Render KaTeX after each update ──────────────────────────────────────────
+  // ── Render KaTeX ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!editorRef.current) return
+    if (!hasMath || !editorRef.current) return
     editorRef.current.querySelectorAll<HTMLElement>('[data-inline-math]').forEach((el) => {
       try { katex.render(el.dataset.inlineMath ?? '', el, { throwOnError: false, displayMode: false }) }
       catch { /* ignore */ }
@@ -103,7 +147,7 @@ export default function TipTapEditor({
     })
   })
 
-  // ── Image upload via server API (bypasses RLS) ───────────────────────────────
+  // ── Image upload ──────────────────────────────────────────────────────────
   const handleImageUpload = useCallback(async (file: File) => {
     if (!editor) return
     setUploading(true)
@@ -111,16 +155,10 @@ export default function TipTapEditor({
       const formData = new FormData()
       formData.append('file', file)
       const res = await fetch('/api/admin/upload', { method: 'POST', body: formData })
-      if (!res.ok) {
-        const data = await res.json()
-        alert(`Upload failed: ${data.error}`)
-        return
-      }
+      if (!res.ok) { const d = await res.json(); alert(`Upload failed: ${d.error}`); return }
       const { url } = await res.json()
       editor.chain().focus().setImage({ src: url }).run()
-    } finally {
-      setUploading(false)
-    }
+    } finally { setUploading(false) }
   }, [editor])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,7 +168,7 @@ export default function TipTapEditor({
     e.target.value = ''
   }
 
-  // ── Insert LaTeX from modal ──────────────────────────────────────────────────
+  // ── Insert LaTeX from modal ───────────────────────────────────────────────
   const insertLatexFormula = useCallback((latex: string, displayMode: boolean) => {
     if (!editor) return
     if (displayMode) {
@@ -139,33 +177,6 @@ export default function TipTapEditor({
       editor.chain().focus().insertContent({ type: 'inlineMath', attrs: { latex } }).run()
     }
   }, [editor])
-
-  // ── $...$ and $$...$$ keyboard shortcuts ────────────────────────────────────
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!editor || (e.key !== ' ' && e.key !== 'Enter')) return
-    const { state } = editor
-    const { from } = state.selection
-    const textBefore = state.doc.textBetween(Math.max(0, from - 200), from)
-
-    const blockMatch = textBefore.match(/\$\$([^$]+)\$\$$/)
-    if (blockMatch) {
-      e.preventDefault()
-      editor.chain()
-        .deleteRange({ from: from - blockMatch[0].length, to: from })
-        .insertContent({ type: 'blockMath', attrs: { latex: blockMatch[1].trim() } })
-        .run()
-      return
-    }
-
-    const inlineMatch = textBefore.match(/\$([^$]+)\$$/)
-    if (inlineMatch) {
-      e.preventDefault()
-      editor.chain()
-        .deleteRange({ from: from - inlineMatch[0].length, to: from })
-        .insertContent({ type: 'inlineMath', attrs: { latex: inlineMatch[1].trim() } })
-        .run()
-    }
-  }
 
   return (
     <div style={{ border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
@@ -177,7 +188,9 @@ export default function TipTapEditor({
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })}>H3</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>• List</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. List</ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
+          {hasCode && (
+            <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
+          )}
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>" Quote</ToolbarButton>
           <ToolbarButton onClick={() => fileInputRef.current?.click()} active={false}>
             {uploading ? 'Uploading...' : '🖼 Image'}
@@ -189,17 +202,27 @@ export default function TipTapEditor({
             style={{ display: 'none' }}
             onChange={handleFileChange}
           />
-          <ToolbarButton onClick={() => setShowLatexModal(true)} active={false}>∑ Formula</ToolbarButton>
-          <span style={{ width: 1, background: '#ddd', margin: '0 4px' }} />
-          <span style={{ fontSize: 12, color: '#888', alignSelf: 'center' }}>
-            Type $x^2$ or $$x^2$$ then Space to render math
-          </span>
+          {hasMath && (
+            <ToolbarButton onClick={() => setShowLatexModal(true)} active={false}>∑ Formula</ToolbarButton>
+          )}
+          {hasMath && (
+            <>
+              <span style={{ width: 1, background: '#ddd', margin: '0 4px' }} />
+              <span style={{ fontSize: 12, color: '#888', alignSelf: 'center' }}>
+                $x^2$ or $$x^2$$ then Space
+              </span>
+            </>
+          )}
         </div>
       )}
-      <div ref={editorRef} onKeyDown={handleKeyDown}>
+      <div
+        ref={editorRef}
+        onClick={() => editor?.commands.focus()}
+        style={{ minHeight: editable ? 400 : undefined, cursor: editable ? 'text' : 'default' }}
+      >
         <EditorContent
           editor={editor}
-          style={{ padding: '1rem', minHeight: editable ? 400 : undefined, fontSize: 15, lineHeight: 1.7 }}
+          style={{ padding: '1rem', fontSize: 15, lineHeight: 1.7 }}
         />
       </div>
       {showLatexModal && (
