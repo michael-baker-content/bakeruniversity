@@ -13,7 +13,7 @@ A custom online course platform built with Next.js, Clerk, Supabase, and Stripe.
 | Database | Supabase (Postgres) |
 | Storage | Supabase Storage |
 | Payments | Stripe (not yet wired up) |
-| Email | Resend (not yet wired up) |
+| Email | Resend (planned) |
 | Rich text editor | TipTap |
 | Math rendering | KaTeX |
 | Code highlighting | Lowlight |
