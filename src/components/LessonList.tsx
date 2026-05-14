@@ -62,11 +62,11 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
           gap: 4,
           padding: '4px 8px',
           fontSize: 11,
-          border: '1px solid #eee',
-          borderRadius: 6,
-          background: 'white',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          background: 'var(--surface)',
           cursor: 'pointer',
-          color: '#555',
+          color: 'var(--text-2)',
           width: 140,
         }}
         title="Assign to module"
@@ -95,9 +95,9 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
             bottom: dropUp ? window.innerHeight - (btnRef.current?.getBoundingClientRect().top ?? 0) + 2 : undefined,
             left: dropLeft,
             zIndex: 50,
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: 6,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             minWidth: 180,
             maxWidth: Math.min(260, window.innerWidth - 16),
@@ -130,6 +130,11 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
           </div>
         </>
       )}
+    <style>{`
+      @media (max-width: 540px) {
+        .lessonlist-meta { display: none !important; }
+      }
+    `}</style>
     </div>
   )
 }
@@ -192,8 +197,8 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
       {lessons.map((lesson, index) => (
         <div key={lesson.id} style={{
           padding: '0.75rem 1rem',
-          border: '1px solid #eee',
-          borderRadius: 8,
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
           opacity: moving === lesson.id ? 0.5 : 1,
           transition: 'opacity 0.15s',
         }}>
@@ -215,7 +220,7 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
                 >▼</button>
               </div>
 
-              <span style={{ fontSize: 13, color: '#999', flexShrink: 0 }}>{index + 1}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>{index + 1}</span>
 
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -223,14 +228,14 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2, flexWrap: 'wrap' }}>
                   <span style={{
-                    fontSize: 11, padding: '1px 6px', borderRadius: 20,
+                    fontSize: 11, padding: '1px 6px', borderRadius: 'var(--radius-full)',
                     background: lesson.is_published ? '#dcfce7' : '#f3f4f6',
                     color: lesson.is_published ? '#166534' : '#6b7280',
                   }}>
                     {lesson.is_published ? 'Published' : 'Draft'}
                   </span>
                   {lesson.module_id && modules.find(m => m.id === lesson.module_id) && (
-                    <span style={{ fontSize: 11, color: '#888' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
                       {modules.find(m => m.id === lesson.module_id)?.title}
                     </span>
                   )}
@@ -250,12 +255,12 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
               )}
 
               <Link href={`/admin/courses/${courseSlug}/lessons/${lesson.slug ?? lesson.id}`}>
-                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
+                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', cursor: 'pointer' }}>
                   Edit
                 </button>
               </Link>
               <Link href={lesson.slug ? `/courses/${courseSlug}/lessons/${lesson.slug}` : `/courses/${courseSlug}/lessons/${lesson.id}`} target="_blank">
-                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
+                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', cursor: 'pointer' }}>
                   Preview ↗
                 </button>
               </Link>

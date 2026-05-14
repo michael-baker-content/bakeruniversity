@@ -17,6 +17,7 @@ A custom online course platform built with Next.js, Clerk, Supabase, and Stripe.
 | Rich text editor | TipTap |
 | Math rendering | KaTeX |
 | Code highlighting | Lowlight |
+| Theming | next-themes (light/dark mode) |
 
 ---
 
@@ -32,6 +33,27 @@ npm install
 
 ```bash
 cp .env.example .env.local
+```
+
+Add the following to `.env.local`:
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_USER_PROFILE_URL=/profile
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+
+RESEND_API_KEY=
 ```
 
 ### 3. Clerk
@@ -83,31 +105,40 @@ Open [http://localhost:3000](http://localhost:3000). After signing up, go to Sup
 src/
 ├── app/
 │   ├── admin/
+│   │   ├── layout.tsx                   # Adds SiteNav to all admin pages
 │   │   ├── courses/[slug]/              # Course editor — lessons, modules, pages
 │   │   └── grading/                     # Review and respond to student text responses
 │   ├── api/
 │   │   ├── admin/                       # Instructor CRUD — courses, lessons, modules, pages
-│   │   ├── course-pages/               # Student read/unread toggle
+│   │   ├── course-pages/                # Student read/unread toggle
 │   │   ├── lessons/[lessonId]/quiz/     # Quiz submission and scoring
 │   │   ├── students/quiz-feedback/      # Fetch instructor feedback
 │   │   └── webhooks/clerk + stripe/     # User sync and enrollment
-│   └── courses/
-│       └── [slug]/
-│           ├── page.tsx                 # Course detail + full contents list
-│           ├── contents/                # Standalone table of contents
-│           ├── lessons/[lessonSlug]/    # Lesson viewer
-│           └── pages/[pageSlug]/        # Course page viewer
+│   ├── courses/
+│   │   └── [slug]/
+│   │       ├── page.tsx                 # Course detail + full contents list
+│   │       ├── contents/                # Standalone table of contents
+│   │       ├── lessons/[lessonSlug]/    # Lesson viewer
+│   │       └── pages/[pageSlug]/        # Course page viewer
+│   └── profile/                         # Clerk user profile
 ├── components/
+│   ├── SiteNav.tsx                      # Server shell for site navigation
+│   ├── SiteNavClient.tsx                # Interactive nav — hamburger, theme toggle
+│   ├── ThemeProvider.tsx                # next-themes wrapper
+│   ├── ThemeToggle.tsx                  # Light/dark mode toggle
 │   ├── TipTapEditor.tsx                 # Rich text editor — configurable packs (math, code)
 │   ├── LessonRenderer.tsx               # Read-only lesson content renderer
 │   ├── LessonSidebar.tsx                # Responsive sidebar with modules and course pages
 │   ├── LessonList.tsx                   # Reorderable lesson list with module assignment
+│   ├── CoursePageList.tsx               # Reorderable course page list with section headers
 │   ├── ModuleManager.tsx                # Module CRUD
+│   ├── ContentRow.tsx                   # Course contents row (client, handles hover)
 │   ├── QuizEditor.tsx                   # Instructor quiz builder
 │   ├── QuizTaker.tsx                    # Student quiz UI
-│   ├── LatexModal.tsx                   # Algebra 1 LaTeX formula reference
+│   ├── LatexModal.tsx                   # LaTeX formula reference
 │   ├── MarkdownImport.tsx               # Import .md/.mdx into the editor
 │   ├── SlidesViewer.tsx                 # PDF and Google Slides embed
+│   ├── SlidesSection.tsx                # Client boundary for slides viewer
 │   └── CoursePageReadToggle.tsx         # Student read progress tracking
 └── lib/
     ├── supabase.ts                       # Browser, server, and service role clients
@@ -130,12 +161,23 @@ src/
 | `/admin/courses/[slug]` | Course editor |
 | `/admin/grading` | Student response grading |
 | `/dashboard` | Student and instructor dashboard |
+| `/profile` | User profile (Clerk) |
+
+---
+
+## Design system
+
+The UI is built on CSS custom properties defined in `globals.css`. Key tokens:
+
+- **Fonts:** DM Serif Display (headings) · DM Sans (body/UI)
+- **Primary:** `#FFB415` amber — buttons, CTAs, active states
+- **Secondary:** `#3D3BF3` indigo — links, lesson active indicator, code
+- **Themes:** light and dark, toggled via `next-themes` with `data-theme` attribute
 
 ---
 
 ## Roadmap
 
-- Visual design polish
 - Certificates on course completion
 - Student onboarding and email notifications (Resend)
 - Stripe payments for paid courses

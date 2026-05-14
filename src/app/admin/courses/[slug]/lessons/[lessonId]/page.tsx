@@ -9,33 +9,36 @@ import MarkdownImport from '@/components/MarkdownImport'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
 
+const INTRO_TYPES = ['introduction', 'conclusion']
+
 export default function EditLessonPage() {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
-  const lessonParam = params.lessonId as string  // may be a slug or a UUID
+  const lessonParam = params.lessonId as string
 
   const [courseId, setCourseId] = useState<string | null>(null)
-  const [lessonUuid, setLessonUuid] = useState<string | null>(lessonParam.includes('-') ? lessonParam : null)
+  const [lessonUuid, setLessonUuid] = useState<string | null>(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonParam) ? lessonParam : null
+  )
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
-  const [content, setContent] = useState<Record<string, unknown>>({})
-  const [isPublished, setIsPublished] = useState(false)
   const [lessonSlug, setLessonSlug] = useState('')
   const [introduction, setIntroduction] = useState('')
-  const [slidesTitle, setSlidesTitle] = useState('')
-  const [slidesDescription, setSlidesDescription] = useState('')
+  const [content, setContent] = useState<Record<string, unknown>>({})
+  const [isPublished, setIsPublished] = useState(false)
   const [slidesUrl, setSlidesUrl] = useState('')
   const [slidesType, setSlidesType] = useState<'pdf' | 'google-slides' | 'none'>('none')
+  const [slidesTitle, setSlidesTitle] = useState('')
+  const [slidesDescription, setSlidesDescription] = useState('')
   const [slidesUploading, setSlidesUploading] = useState(false)
   const [slidesError, setSlidesError] = useState('')
   const slidesFileRef = useRef<HTMLInputElement>(null)
 
-  // Resolve courseSlug → courseId, then lessonParam (slug or UUID) → lessonId, then load lesson
   useEffect(() => {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonParam)
 
@@ -45,7 +48,6 @@ export default function EditLessonPage() {
         if (!data.id) return
         setCourseId(data.id)
 
-        // Resolve lesson slug → UUID if needed
         let resolvedLessonId = lessonParam
         if (!isUuid) {
           const res = await fetch(`/api/admin/lesson-id-by-slug?courseId=${data.id}&slug=${encodeURIComponent(lessonParam)}`)
@@ -61,10 +63,10 @@ export default function EditLessonPage() {
           .then((r) => r.json())
           .then((lesson) => {
             setTitle(lesson.title ?? '')
-            setContent(lesson.content ?? {})
-            setIsPublished(lesson.is_published ?? false)
             setLessonSlug(lesson.slug ?? '')
             setIntroduction(lesson.introduction ?? '')
+            setContent(lesson.content ?? {})
+            setIsPublished(lesson.is_published ?? false)
             setSlidesTitle(lesson.slides_meta?.title ?? '')
             setSlidesDescription(lesson.slides_meta?.description ?? '')
             const url = lesson.slides_url ?? ''
@@ -80,7 +82,7 @@ export default function EditLessonPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!courseId) return
+    if (!courseId || !lessonUuid) return
     setSaving(true)
     setError('')
 
@@ -108,62 +110,57 @@ export default function EditLessonPage() {
       setSaving(false)
       return
     }
-
     router.push(`/admin/courses/${slug}`)
   }
 
-  if (loading) return <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1rem' }}>Loading...</main>
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--text-3)' }}>
+      Loading…
+    </div>
+  )
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1rem' }}>
-      <Link href={`/admin/courses/${slug}`} style={{ fontSize: 14, color: '#666' }}>← Back to course</Link>
-      <h1 style={{ margin: '0.5rem 0 1.5rem' }}>Edit lesson</h1>
+    <main className="page">
+      <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: '1.25rem' }}>
+        <Link href="/admin/courses" style={{ color: 'var(--text-3)' }}>My courses</Link>
+        <span style={{ margin: '0 6px' }}>›</span>
+        <Link href={`/admin/courses/${slug}`} style={{ color: 'var(--text-3)' }}>{slug}</Link>
+        <span style={{ margin: '0 6px' }}>›</span>
+        <span style={{ color: 'var(--text-2)' }}>Edit lesson</span>
+      </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <h1 style={{ margin: '0 0 2rem' }}>Edit lesson</h1>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Title */}
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-            Title <span style={{ color: 'red' }}>*</span>
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px 10px', fontSize: 14, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
-          />
+          <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+          <input className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
 
+        {/* Slug */}
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>URL slug</label>
+          <label style={labelStyle}>URL slug</label>
           <input
+            className="input"
             type="text"
             value={lessonSlug}
             onChange={(e) => setLessonSlug(e.target.value)}
             placeholder="auto-generated from title"
-            style={{ width: '100%', padding: '8px 10px', fontSize: 14, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
           />
-          <p style={{ fontSize: 11, color: '#888', margin: '3px 0 0' }}>
-            Used in the lesson URL: /courses/[course]/lessons/{lessonSlug || 'your-slug'}
-          </p>
+          <p style={hintStyle}>Used in the lesson URL: /courses/{slug}/lessons/{lessonSlug || 'your-slug'}</p>
         </div>
 
+        {/* Introduction */}
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Introduction</label>
-          <textarea
-            value={introduction}
-            onChange={(e) => setIntroduction(e.target.value)}
-            placeholder="A short paragraph introducing this lesson, shown above the content..."
-            rows={3}
-            style={{ width: '100%', padding: '8px 10px', fontSize: 14, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box', resize: 'vertical' }}
-          />
+          <label style={labelStyle}>Introduction <span style={optStyle}>(plain text, shown above content)</span></label>
+          <textarea className="input" value={introduction} onChange={(e) => setIntroduction(e.target.value)} rows={3} />
         </div>
 
+        {/* Content */}
         <div>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Content</label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <p style={{ fontSize: 12, color: '#888', margin: 0 }}>
-              Type $x^2$ then Space for inline math · $$x^2 + y^2 = z^2$$ then Space for block math
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <label style={labelStyle}>Content</label>
             <MarkdownImport
               hasExistingContent={Object.keys(content).length > 0}
               onInsert={(doc) => insertFnRef.current?.(doc)}
@@ -179,21 +176,16 @@ export default function EditLessonPage() {
           )}
         </div>
 
-        {/* Slides section */}
-        <div style={{ borderTop: '1px solid #eee', paddingTop: '1.25rem' }}>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Slides (optional)</label>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {/* Slides */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+          <label style={labelStyle}>Slides <span style={optStyle}>(optional)</span></label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
             {(['none', 'pdf', 'google-slides'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => { setSlidesType(t); if (t === 'none') setSlidesUrl('') }}
-                style={{
-                  padding: '4px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                  border: '1px solid #ddd',
-                  background: slidesType === t ? '#111' : 'white',
-                  color: slidesType === t ? '#fff' : '#555',
-                }}
+                className={`btn btn-sm ${slidesType === t ? 'btn-secondary' : 'btn-ghost'}`}
               >
                 {t === 'none' ? 'None' : t === 'pdf' ? 'Upload PDF' : 'Google Slides'}
               </button>
@@ -204,128 +196,85 @@ export default function EditLessonPage() {
             <div>
               {slidesUrl && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: '#166534' }}>✓ PDF uploaded</span>
-                  <a href={slidesUrl} target="_blank" style={{ fontSize: 12, color: '#0066cc' }}>View ↗</a>
-                  <button
-                    type="button"
-                    onClick={() => setSlidesUrl('')}
-                    style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
-                  >
+                  <span style={{ fontSize: 13, color: 'var(--success)' }}>✓ PDF uploaded</span>
+                  <a href={slidesUrl} target="_blank" style={{ fontSize: 12, color: 'var(--indigo)' }}>View ↗</a>
+                  <button type="button" onClick={() => setSlidesUrl('')}
+                    style={{ fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     Remove
                   </button>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => slidesFileRef.current?.click()}
-                disabled={slidesUploading}
-                style={{ padding: '6px 14px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}
-              >
-                {slidesUploading ? 'Uploading...' : slidesUrl ? 'Replace PDF' : 'Choose PDF'}
+              <button type="button" onClick={() => slidesFileRef.current?.click()}
+                disabled={slidesUploading} className="btn btn-ghost btn-sm">
+                {slidesUploading ? 'Uploading…' : slidesUrl ? 'Replace PDF' : 'Choose PDF'}
               </button>
-              <input
-                ref={slidesFileRef}
-                type="file"
-                accept="application/pdf"
-                style={{ display: 'none' }}
+              <input ref={slidesFileRef} type="file" accept="application/pdf" style={{ display: 'none' }}
                 onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
-                  setSlidesUploading(true)
-                  setSlidesError('')
-                  const formData = new FormData()
-                  formData.append('file', file)
-                  const res = await fetch('/api/admin/upload-slides', { method: 'POST', body: formData })
+                  setSlidesUploading(true); setSlidesError('')
+                  const fd = new FormData(); fd.append('file', file)
+                  const res = await fetch('/api/admin/upload-slides', { method: 'POST', body: fd })
                   const data = await res.json()
-                  if (!res.ok) { setSlidesError(data.error ?? 'Upload failed') }
-                  else { setSlidesUrl(data.url) }
-                  setSlidesUploading(false)
-                  e.target.value = ''
-                }}
-              />
-              {slidesError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{slidesError}</p>}
+                  if (!res.ok) setSlidesError(data.error ?? 'Upload failed')
+                  else setSlidesUrl(data.url)
+                  setSlidesUploading(false); e.target.value = ''
+                }} />
+              {slidesError && <p style={{ fontSize: 12, color: 'var(--danger)', margin: '6px 0 0' }}>{slidesError}</p>}
             </div>
           )}
 
           {slidesType === 'google-slides' && (
             <div>
-              <input
-                type="url"
-                value={slidesUrl}
-                onChange={(e) => setSlidesUrl(e.target.value)}
-                placeholder="https://docs.google.com/presentation/d/..."
-                style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
-              />
-              <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>
-                Paste the URL from File → Share → Publish to web in Google Slides.
-              </p>
+              <input className="input" type="url" value={slidesUrl} onChange={(e) => setSlidesUrl(e.target.value)}
+                placeholder="https://docs.google.com/presentation/d/..." />
+              <p style={hintStyle}>Paste the URL from File → Share → Publish to web in Google Slides.</p>
             </div>
           )}
 
           {slidesType !== 'none' && (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 3, color: '#555' }}>Slides title (optional)</label>
-                <input
-                  type="text"
-                  value={slidesTitle}
-                  onChange={(e) => setSlidesTitle(e.target.value)}
-                  placeholder="e.g. Unit 1 Overview"
-                  style={{ width: '100%', padding: '7px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
-                />
+                <label style={{ ...labelStyle, fontWeight: 400, color: 'var(--text-2)' }}>Slides title <span style={optStyle}>(optional)</span></label>
+                <input className="input" type="text" value={slidesTitle} onChange={(e) => setSlidesTitle(e.target.value)} placeholder="e.g. Unit 1 Overview" />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 3, color: '#555' }}>Slides description (optional)</label>
-                <textarea
-                  value={slidesDescription}
-                  onChange={(e) => setSlidesDescription(e.target.value)}
-                  placeholder="Brief description of what these slides cover..."
-                  rows={2}
-                  style={{ width: '100%', padding: '7px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box', resize: 'vertical' }}
-                />
+                <label style={{ ...labelStyle, fontWeight: 400, color: 'var(--text-2)' }}>Slides description <span style={optStyle}>(optional)</span></label>
+                <textarea className="input" value={slidesDescription} onChange={(e) => setSlidesDescription(e.target.value)}
+                  rows={2} placeholder="Brief description of what these slides cover…" />
               </div>
             </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            type="checkbox"
-            id="published"
-            checked={isPublished}
-            onChange={(e) => setIsPublished(e.target.checked)}
-          />
-          <label htmlFor="published" style={{ fontSize: 13 }}>
-            Published (visible to enrolled students)
-          </label>
-        </div>
+        {/* Published */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
+          <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} />
+          Published (visible to enrolled students)
+        </label>
 
-        {error && <p style={{ color: 'red', fontSize: 14 }}>{error}</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: 14 }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="submit"
-            disabled={saving || !title || !courseId}
-            style={{
-              padding: '8px 20px', background: '#111', color: '#fff', border: 'none', borderRadius: 6,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving || !title || !courseId ? 0.6 : 1,
-            }}
-          >
-            {saving ? 'Saving...' : 'Save lesson'}
+        <div style={{ display: 'flex', gap: 8, paddingTop: '0.5rem' }}>
+          <button type="submit" disabled={saving || !title || !courseId} className="btn btn-primary">
+            {saving ? 'Saving…' : 'Save lesson'}
           </button>
           <Link href={`/admin/courses/${slug}`}>
-            <button type="button" style={{ padding: '8px 16px', border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
-              Cancel
-            </button>
+            <button type="button" className="btn btn-ghost">Cancel</button>
           </Link>
         </div>
       </form>
 
-      {/* Quiz editor — outside the form so it doesn't submit on Enter */}
-      {ready && courseId && (
-        <QuizEditor courseId={courseId} lessonId={lessonUuid!} />
+      {ready && courseId && lessonUuid && (
+        <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', margin: '0 0 1.25rem' }}>Quiz</h2>
+          <QuizEditor courseId={courseId} lessonId={lessonUuid} />
+        </div>
       )}
     </main>
   )
 }
+
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--text)' }
+const hintStyle: React.CSSProperties = { fontSize: 12, color: 'var(--text-3)', margin: '4px 0 0' }
+const optStyle: React.CSSProperties = { fontWeight: 400, color: 'var(--text-3)', fontSize: 12 }

@@ -24,6 +24,8 @@ interface SidebarModule {
   position: number
 }
 
+const BEFORE_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
+
 interface LessonSidebarProps {
   courseSlug: string
   courseTitle: string
@@ -33,6 +35,7 @@ interface LessonSidebarProps {
   afterPages: CoursePage[]
   currentLessonId: string
   currentLessonSlug: string | null
+  currentPageId?: string
 }
 
 function lessonHref(courseSlug: string, lesson: SidebarLesson) {
@@ -41,270 +44,262 @@ function lessonHref(courseSlug: string, lesson: SidebarLesson) {
     : `/courses/${courseSlug}/lessons/${lesson.id}`
 }
 
-function isActive(lesson: SidebarLesson, currentLessonId: string, currentLessonSlug: string | null) {
-  return lesson.slug === currentLessonSlug || lesson.id === currentLessonId
+function pageHref(courseSlug: string, page: CoursePage) {
+  return page.slug
+    ? `/courses/${courseSlug}/pages/${page.slug}`
+    : `/courses/${courseSlug}/pages/${page.id}`
 }
 
-function LessonLink({ lesson, courseSlug, currentLessonId, currentLessonSlug, index, onClick }: {
-  lesson: SidebarLesson
-  courseSlug: string
-  currentLessonId: string
-  currentLessonSlug: string | null
-  index: number
-  onClick?: () => void
+function isActive(lesson: SidebarLesson, currentId: string, currentSlug: string | null) {
+  return lesson.slug === currentSlug || lesson.id === currentId
+}
+
+function SidebarLink({ href, active, children, indent }: {
+  href: string
+  active?: boolean
+  children: React.ReactNode
+  indent?: boolean
 }) {
-  const active = isActive(lesson, currentLessonId, currentLessonSlug)
   return (
-    <Link href={lessonHref(courseSlug, lesson)} style={{ textDecoration: 'none' }} onClick={onClick}>
+    <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{
-        padding: '8px 1rem',
+        padding: '7px 1rem',
+        paddingLeft: indent ? '1.75rem' : '1rem',
         fontSize: 13,
-        background: active ? '#f0f0f0' : 'transparent',
+        lineHeight: 1.4,
+        color: active ? 'var(--text)' : 'var(--text-2)',
         fontWeight: active ? 500 : 400,
-        color: active ? '#111' : '#444',
-        borderLeft: active ? '3px solid #111' : '3px solid transparent',
-        display: 'flex',
-        gap: 8,
-        alignItems: 'flex-start',
+        background: active ? 'var(--surface-2)' : 'transparent',
+        borderLeft: `3px solid ${active ? 'var(--indigo)' : 'transparent'}`,
+        transition: 'background 0.1s, color 0.1s',
       }}>
-        <span style={{ color: '#aaa', minWidth: 20, fontSize: 12, paddingTop: 1, flexShrink: 0 }}>{index + 1}</span>
-        <span style={{ lineHeight: 1.4 }}>{lesson.title}</span>
+        {children}
       </div>
     </Link>
   )
 }
 
-function SidebarContent({ courseSlug, courseTitle, lessons, modules, beforePages, afterPages, currentLessonId, currentLessonSlug, onLessonClick }: {
-  courseSlug: string
-  courseTitle: string
-  lessons: SidebarLesson[]
-  modules: SidebarModule[]
-  beforePages: CoursePage[]
-  afterPages: CoursePage[]
-  currentLessonId: string
-  currentLessonSlug: string | null
-  onLessonClick?: () => void
-}) {
-  const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set())
+function PageLink({ href, title }: { href: string; title: string }) {
+  return (
+    <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{
+        padding: '7px 1rem',
+        fontSize: 13,
+        color: 'var(--text-2)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        borderLeft: '3px solid transparent',
+        transition: 'color 0.1s',
+      }}>
+        <span style={{ fontSize: 9, color: 'var(--text-3)', flexShrink: 0 }}>◆</span>
+        {title}
+      </div>
+    </Link>
+  )
+}
 
-  const toggleModule = (moduleId: string) => {
-    setCollapsedModules((prev) => {
-      const next = new Set(prev)
-      if (next.has(moduleId)) next.delete(moduleId)
-      else next.add(moduleId)
-      return next
-    })
-  }
+function SectionDivider({ label }: { label?: string }) {
+  return (
+    <div style={{
+      padding: '8px 1rem 4px',
+      fontSize: 10,
+      fontWeight: 700,
+      color: 'var(--text-3)',
+      textTransform: 'uppercase',
+      letterSpacing: '0.07em',
+      borderTop: '1px solid var(--border)',
+      marginTop: 4,
+    }}>
+      {label}
+    </div>
+  )
+}
 
-  // Group lessons
+function SidebarContent({
+  courseSlug, courseTitle, lessons, modules, beforePages, afterPages,
+  currentLessonId, currentLessonSlug, onLessonClick,
+}: LessonSidebarProps & { onLessonClick?: () => void }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const toggleModule = (id: string) => setCollapsed((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const unassigned = lessons.filter((l) => !l.module_id)
   const byModule = modules.map((m) => ({
     module: m,
     lessons: lessons.filter((l) => l.module_id === m.id),
   }))
 
-  // Global index for lesson numbering
   let globalIndex = 0
 
   return (
-    <>
-      <div style={{ padding: '0 1rem 1rem', borderBottom: '1px solid #eee', marginBottom: '0.5rem' }}>
-        <Link href={`/courses/${courseSlug}`} style={{ fontSize: 13, color: '#666' }}>← {courseTitle}</Link>
+    <div style={{ paddingBottom: '2rem' }}>
+      {/* Back link */}
+      <div style={{ padding: '0 1rem 0.875rem', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+        <Link href={`/courses/${courseSlug}`} style={{
+          fontSize: 12, color: 'var(--text-3)', textDecoration: 'none',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          <span>←</span> <span>{courseTitle}</span>
+        </Link>
+        <Link href={`/courses/${courseSlug}/contents`} style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', display: 'block', marginTop: 4 }}>
+          Table of Contents
+        </Link>
       </div>
 
-      <nav>
-        {/* Before-lesson pages */}
-        {beforePages.map((page) => (
-          <Link key={page.id} href={`/courses/${courseSlug}/pages/${page.slug ?? page.id}`} style={{ textDecoration: 'none' }} onClick={onLessonClick}>
-            <div style={{ padding: '8px 1rem', fontSize: 13, color: '#444', borderLeft: '3px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: '#aaa', flexShrink: 0 }}>◆</span>
-              <span style={{ lineHeight: 1.4 }}>{page.title}</span>
-            </div>
-          </Link>
-        ))}
-        {beforePages.length > 0 && <div style={{ borderTop: '1px solid #f0f0f0', margin: '4px 0' }} />}
+      {/* Before pages */}
+      {beforePages.length > 0 && (
+        <>
+          <SectionDivider label="Introduction" />
+          {beforePages.map((p) => (
+            <PageLink key={p.id} href={pageHref(courseSlug, p)} title={p.title} />
+          ))}
+        </>
+      )}
 
-        {/* Unassigned lessons (no module) */}
-        {unassigned.map((lesson) => (
-          <LessonLink
-            key={lesson.id}
-            lesson={lesson}
-            courseSlug={courseSlug}
-            currentLessonId={currentLessonId}
-            currentLessonSlug={currentLessonSlug}
-            index={globalIndex++}
-            onClick={onLessonClick}
-          />
-        ))}
+      {/* Lessons header */}
+      {(unassigned.length > 0 || modules.length > 0) && (
+        <SectionDivider label="Lessons" />
+      )}
 
-        {/* Module groups */}
-        {byModule.map(({ module, lessons: moduleLessons }) => {
-          if (moduleLessons.length === 0) return null
-          const collapsed = collapsedModules.has(module.id)
-          const startIndex = globalIndex
-          globalIndex += moduleLessons.length
+      {/* Unassigned lessons */}
+      {unassigned.map((lesson) => {
+        globalIndex++
+        const active = isActive(lesson, currentLessonId, currentLessonSlug)
+        return (
+          <div key={lesson.id} onClick={onLessonClick}>
+            <SidebarLink href={lessonHref(courseSlug, lesson)} active={active}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>{globalIndex}</span>
+              {lesson.title}
+            </SidebarLink>
+          </div>
+        )
+      })}
 
-          return (
-            <div key={module.id}>
-              <button
-                onClick={() => toggleModule(module.id)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '8px 1rem',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#888',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid #f5f5f5',
-                  marginTop: 4,
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{module.title}</span>
-                <span style={{ flexShrink: 0, marginLeft: 4 }}>{collapsed ? '▶' : '▼'}</span>
-              </button>
-              {!collapsed && moduleLessons.map((lesson, i) => (
-                <LessonLink
-                  key={lesson.id}
-                  lesson={lesson}
-                  courseSlug={courseSlug}
-                  currentLessonId={currentLessonId}
-                  currentLessonSlug={currentLessonSlug}
-                  index={startIndex + i}
-                  onClick={onLessonClick}
-                />
-              ))}
-            </div>
-          )
-        })}
-        {/* After-lesson pages */}
-        {afterPages.length > 0 && <div style={{ borderTop: '1px solid #f0f0f0', margin: '4px 0' }} />}
-        {afterPages.map((page) => (
-          <Link key={page.id} href={`/courses/${courseSlug}/pages/${page.slug ?? page.id}`} style={{ textDecoration: 'none' }} onClick={onLessonClick}>
-            <div style={{ padding: '8px 1rem', fontSize: 13, color: '#444', borderLeft: '3px solid transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: '#aaa', flexShrink: 0 }}>◆</span>
-              <span style={{ lineHeight: 1.4 }}>{page.title}</span>
-            </div>
-          </Link>
-        ))}
-      </nav>
-    </>
+      {/* Module groups */}
+      {byModule.map(({ module, lessons: modLessons }) => {
+        if (!modLessons.length) return null
+        const isCollapsed = collapsed.has(module.id)
+        const startIndex = globalIndex
+        globalIndex += modLessons.length
+
+        return (
+          <div key={module.id}>
+            <button
+              onClick={() => toggleModule(module.id)}
+              style={{
+                width: '100%', textAlign: 'left',
+                padding: '7px 1rem',
+                fontSize: 10, fontWeight: 700,
+                color: 'var(--text-3)',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderTop: '1px solid var(--border)',
+                marginTop: 4,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{module.title}</span>
+              <span style={{ flexShrink: 0, marginLeft: 4, fontSize: 8 }}>{isCollapsed ? '▶' : '▼'}</span>
+            </button>
+            {!isCollapsed && modLessons.map((lesson, i) => {
+              const active = isActive(lesson, currentLessonId, currentLessonSlug)
+              return (
+                <div key={lesson.id} onClick={onLessonClick}>
+                  <SidebarLink href={lessonHref(courseSlug, lesson)} active={active} indent>
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', marginRight: 6, flexShrink: 0 }}>Lesson {startIndex + i + 1}</span>
+                    {lesson.title}
+                  </SidebarLink>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+
+      {/* After pages */}
+      {afterPages.length > 0 && (
+        <>
+          <SectionDivider label="Conclusion" />
+          {afterPages.map((p) => (
+            <PageLink key={p.id} href={pageHref(courseSlug, p)} title={p.title} />
+          ))}
+        </>
+      )}
+    </div>
   )
 }
 
-export default function LessonSidebar({
-  courseSlug,
-  courseTitle,
-  lessons,
-  modules,
-  beforePages,
-  afterPages,
-  currentLessonId,
-  currentLessonSlug,
-}: LessonSidebarProps) {
+export default function LessonSidebar(props: LessonSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const currentIndex = lessons.findIndex((l) => isActive(l, currentLessonId, currentLessonSlug))
-  const currentLesson = lessons[currentIndex]
+  const currentIndex = props.lessons.findIndex((l) => isActive(l, props.currentLessonId, props.currentLessonSlug))
+  const currentLesson = props.lessons[currentIndex]
+
+  // When viewing a course page, find it and determine its section label
+  const currentPage = props.currentPageId
+    ? [...props.beforePages, ...props.afterPages].find((p) => p.id === props.currentPageId)
+    : null
+  const currentPageSection = currentPage
+    ? (BEFORE_TYPES.includes(currentPage.page_type) ? 'Introduction' : 'Conclusion')
+    : null
 
   return (
     <>
-      {/* ── Desktop sidebar ─────────────────────────────────────── */}
+      {/* Desktop */}
       <aside className="lesson-sidebar-desktop">
-        <SidebarContent
-          courseSlug={courseSlug}
-          courseTitle={courseTitle}
-          lessons={lessons}
-          modules={modules}
-          beforePages={beforePages}
-          afterPages={afterPages}
-          currentLessonId={currentLessonId}
-          currentLessonSlug={currentLessonSlug}
-        />
+        <SidebarContent {...props} />
       </aside>
 
-      {/* ── Mobile top bar ──────────────────────────────────────── */}
+      {/* Mobile top bar */}
       <div className="lesson-sidebar-mobile">
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.75rem 1rem',
-          borderBottom: '1px solid #eee',
-          background: 'white',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 1rem', height: 48,
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          position: 'sticky', top: 52, zIndex: 40,
         }}>
-          <Link href={`/courses/${courseSlug}`} style={{ fontSize: 13, color: '#666', whiteSpace: 'nowrap' }}>← Back</Link>
+          <Link href={`/courses/${props.courseSlug}`} style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Back</Link>
           <button
             onClick={() => setMobileOpen((o) => !o)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 13, background: 'none', border: '1px solid #eee',
-              borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+              fontSize: 13, background: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)', padding: '5px 10px',
+              cursor: 'pointer', color: 'var(--text-2)',
               maxWidth: '60vw', overflow: 'hidden',
             }}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentIndex + 1}. {currentLesson?.title ?? 'Lessons'}
+              {currentPage
+                ? `${currentPageSection}: ${currentPage.title}`
+                : currentLesson
+                  ? `Lesson ${currentIndex + 1}: ${currentLesson.title}`
+                  : 'Contents'}
             </span>
-            <span style={{ flexShrink: 0 }}>{mobileOpen ? '▲' : '▼'}</span>
+            <span style={{ flexShrink: 0, fontSize: 10 }}>{mobileOpen ? '▲' : '▼'}</span>
           </button>
         </div>
 
         {mobileOpen && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.4)',
-          }} onClick={() => setMobileOpen(false)}>
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 39 }} onClick={() => setMobileOpen(false)} />
             <div style={{
-              background: 'white', maxHeight: '70vh',
-              overflowY: 'auto', borderBottom: '1px solid #eee',
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 500, fontSize: 14 }}>{courseTitle}</span>
-                <button onClick={() => setMobileOpen(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#888' }}>×</button>
-              </div>
-              <SidebarContent
-                courseSlug={courseSlug}
-                courseTitle={courseTitle}
-                lessons={lessons}
-                modules={modules}
-                beforePages={beforePages}
-                afterPages={afterPages}
-                currentLessonId={currentLessonId}
-                currentLessonSlug={currentLessonSlug}
-                onLessonClick={() => setMobileOpen(false)}
-              />
+              position: 'fixed', top: 100, left: 0, right: 0,
+              background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+              zIndex: 40, maxHeight: '60vh', overflowY: 'auto',
+              boxShadow: 'var(--shadow)',
+            }}>
+              <SidebarContent {...props} onLessonClick={() => setMobileOpen(false)} />
             </div>
-          </div>
+          </>
         )}
       </div>
-
-      <style>{`
-        .lesson-sidebar-desktop {
-          width: 260px;
-          border-right: 1px solid #eee;
-          padding: 1.5rem 0;
-          position: sticky;
-          top: 0;
-          height: 100vh;
-          overflow-y: auto;
-          flex-shrink: 0;
-        }
-        .lesson-sidebar-mobile { display: none; }
-        @media (max-width: 768px) {
-          .lesson-sidebar-desktop { display: none; }
-          .lesson-sidebar-mobile { display: block; }
-        }
-      `}</style>
     </>
   )
 }

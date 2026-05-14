@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface Module {
   id: string
@@ -33,6 +33,16 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
   }, [basePath, onModulesChange])
 
   useEffect(() => { load() }, [load])
+
+  // Listen for add-module event dispatched by the section header button
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent
+      if (ev.detail === courseId) setAdding(true)
+    }
+    document.addEventListener('add-module', handler)
+    return () => document.removeEventListener('add-module', handler)
+  }, [courseId])
 
   const addModule = async () => {
     if (!newTitle.trim()) return
@@ -95,21 +105,9 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
   if (loading) return null
 
   return (
-    <div style={{ marginTop: '2rem', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Modules</h2>
-        {!adding && (
-          <button
-            onClick={() => setAdding(true)}
-            style={{ padding: '5px 12px', fontSize: 12, border: '1px dashed #ddd', borderRadius: 6, background: 'white', cursor: 'pointer', color: '#555' }}
-          >
-            + Add module
-          </button>
-        )}
-      </div>
-
+    <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
       {modules.length === 0 && !adding && (
-        <p style={{ fontSize: 13, color: '#888' }}>
+        <p style={{ fontSize: 13, color: 'var(--text-2)' }}>
           No modules yet. Modules let you group lessons into units (e.g. "Unit 1: Linear Equations").
         </p>
       )}
@@ -121,9 +119,9 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
             alignItems: 'center',
             gap: 8,
             padding: '8px 10px',
-            border: '1px solid #eee',
+            border: '1px solid var(--border)',
             borderRadius: 8,
-            background: '#fafafa',
+            background: 'var(--surface-2)',
           }}>
             {/* Reorder arrows */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -147,16 +145,16 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
                   onChange={(e) => setEditTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') renameModule(mod.id); if (e.key === 'Escape') setEditingId(null) }}
                   autoFocus
-                  style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #ddd', borderRadius: 4 }}
+                  style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 4 }}
                 />
                 <button
                   onClick={() => renameModule(mod.id)}
                   disabled={saving}
-                  style={{ padding: '4px 10px', fontSize: 12, background: '#111', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  style={{ padding: '4px 10px', fontSize: 12, background: 'var(--text)', color: 'var(--bg)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                 >Save</button>
                 <button
                   onClick={() => setEditingId(null)}
-                  style={{ padding: '4px 8px', fontSize: 12, border: '1px solid #ddd', borderRadius: 4, background: 'white', cursor: 'pointer' }}
+                  style={{ padding: '4px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', cursor: 'pointer' }}
                 >Cancel</button>
               </div>
             ) : (
@@ -164,11 +162,11 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{mod.title}</span>
                 <button
                   onClick={() => { setEditingId(mod.id); setEditTitle(mod.title) }}
-                  style={{ fontSize: 12, color: '#555', background: 'none', border: '1px solid #eee', borderRadius: 4, cursor: 'pointer', padding: '2px 8px' }}
+                  style={{ fontSize: 12, color: 'var(--text-2)', background: 'none', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', padding: '2px 8px' }}
                 >Rename</button>
                 <button
                   onClick={() => deleteModule(mod.id, mod.title)}
-                  style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+                  style={{ fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
                 >Delete</button>
               </>
             )}
@@ -185,16 +183,16 @@ export default function ModuleManager({ courseId, onModulesChange }: ModuleManag
             onKeyDown={(e) => { if (e.key === 'Enter') addModule(); if (e.key === 'Escape') { setAdding(false); setNewTitle('') } }}
             placeholder="e.g. Unit 1: Linear Equations"
             autoFocus
-            style={{ flex: 1, padding: '7px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6 }}
+            style={{ flex: 1, padding: '7px 10px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 6 }}
           />
           <button
             onClick={addModule}
             disabled={saving || !newTitle.trim()}
-            style={{ padding: '7px 14px', fontSize: 13, background: '#111', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+            style={{ padding: '7px 14px', fontSize: 13, background: 'var(--text)', color: 'var(--bg)', border: 'none', borderRadius: 6, cursor: 'pointer' }}
           >Add</button>
           <button
             onClick={() => { setAdding(false); setNewTitle('') }}
-            style={{ padding: '7px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: 'pointer' }}
+            style={{ padding: '7px 10px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)', cursor: 'pointer' }}
           >Cancel</button>
         </div>
       )}

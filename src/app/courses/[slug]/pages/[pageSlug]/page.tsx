@@ -4,31 +4,24 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import LessonRenderer from '@/components/LessonRenderer'
 import CoursePageReadToggle from '@/components/CoursePageReadToggle'
-import type { Course, User } from '@/lib/types'
+import LessonSidebar from '@/components/LessonSidebar'
+import SiteNav from '@/components/SiteNav'
+import type { Course, Lesson, User } from '@/lib/types'
 
 interface CoursePage {
   id: string
-  title: string
   slug: string | null
+  title: string
   page_type: string
   content: Record<string, unknown> | null
   introduction: string | null
   is_published: boolean
-}
-
-interface Module {
-  id: string
-  title: string
   position: number
 }
 
-interface SidebarLesson {
-  id: string
-  slug: string | null
-  title: string
-  position: number
-  module_id: string | null
-}
+interface Module { id: string; title: string; position: number }
+
+const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
 
 export default async function CoursePageViewer({
   params,
@@ -50,7 +43,6 @@ export default async function CoursePageViewer({
     .from('users').select('*').eq('clerk_id', clerkUser.id).single<User>()
   if (!dbUser) redirect('/sign-in')
 
-  // Check access
   const isFree = course.price_cents === 0
   if (!isFree) {
     const { data: enrollment } = await serviceSupabase
@@ -58,137 +50,131 @@ export default async function CoursePageViewer({
     if (!enrollment) redirect(`/courses/${slug}`)
   }
 
-  // Get the page by slug
   const { data: page } = await supabase
-    .from('course_pages')
-    .select('*')
-    .eq('slug', pageSlug)
-    .eq('course_id', course.id)
-    .eq('is_published', true)
+    .from('course_pages').select('*')
+    .eq('slug', pageSlug).eq('course_id', course.id).eq('is_published', true)
     .single<CoursePage>()
-
   if (!page) notFound()
 
-  // Get all published pages and lessons for sidebar
-  const { data: allPages } = await supabase
-    .from('course_pages')
-    .select('id, slug, title, page_type, position')
-    .eq('course_id', course.id)
-    .eq('is_published', true)
-    .order('position', { ascending: true })
-    .returns<Pick<CoursePage, 'id' | 'slug' | 'title' | 'page_type'>[]>()
+  // Fetch all content for sidebar + navigation
+  const [allPagesRes, lessonsRes, modulesRes] = await Promise.all([
+    supabase.from('course_pages').select('id, slug, title, page_type, position')
+      .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true }),
+    supabase.from('lessons').select('id, slug, title, position, module_id')
+      .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
+      .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
+    supabase.from('modules').select('id, title, position')
+      .eq('course_id', course.id).order('position', { ascending: true }).returns<Module[]>(),
+  ])
 
-  const { data: allLessons } = await supabase
-    .from('lessons')
-    .select('id, slug, title, position, module_id')
-    .eq('course_id', course.id)
-    .eq('is_published', true)
-    .order('position', { ascending: true })
-    .returns<SidebarLesson[]>()
+  const allPages = (allPagesRes.data ?? []) as CoursePage[]
+  const allLessons = lessonsRes.data ?? []
+  const modules = modulesRes.data ?? []
 
-  const { data: modules } = await supabase
-    .from('modules')
-    .select('id, title, position')
-    .eq('course_id', course.id)
-    .order('position', { ascending: true })
-    .returns<Module[]>()
+  const sidebarBeforePages = allPages.filter((p) => beforeTypes.includes(p.page_type))
+  const sidebarAfterPages = allPages.filter((p) => !beforeTypes.includes(p.page_type))
 
-  // Split pages into before/after lessons
-  const beforeTypes = ['overview', 'introduction', 'syllabus', 'requirements']
-  const beforePages = (allPages ?? []).filter((p) => beforeTypes.includes(p.page_type))
-  const afterPages = (allPages ?? []).filter((p) => !beforeTypes.includes(p.page_type))
+  // Build ordered sequence for prev/next: beforePages → lessons → afterPages
+  const isBefore = beforeTypes.includes(page.page_type)
+  const beforePages = allPages.filter((p) => beforeTypes.includes(p.page_type))
+  const afterPages = allPages.filter((p) => !beforeTypes.includes(p.page_type))
 
-  const firstLesson = allLessons?.[0]
-  const firstLessonHref = firstLesson
-    ? (firstLesson.slug ? `/courses/${slug}/lessons/${firstLesson.slug}` : `/courses/${slug}/lessons/${firstLesson.id}`)
-    : null
+  // Full sequence for prev/next
+  const sequence: { type: 'page' | 'lesson'; id: string; slug: string | null; title: string }[] = [
+    ...beforePages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
+    ...allLessons.map((l) => ({ type: 'lesson' as const, id: l.id, slug: l.slug ?? null, title: l.title })),
+    ...afterPages.map((p) => ({ type: 'page' as const, id: p.id, slug: p.slug, title: p.title })),
+  ]
+
+  const currentSeqIndex = sequence.findIndex((s) => s.id === page.id)
+  const prevItem = sequence[currentSeqIndex - 1]
+  const nextItem = sequence[currentSeqIndex + 1]
+
+  const itemHref = (item: typeof sequence[0]) =>
+    item.type === 'lesson'
+      ? (item.slug ? `/courses/${slug}/lessons/${item.slug}` : `/courses/${slug}/lessons/${item.id}`)
+      : (item.slug ? `/courses/${slug}/pages/${item.slug}` : `/courses/${slug}/pages/${item.id}`)
 
   return (
-    <div className="lesson-viewer-layout">
-      {/* Sidebar */}
-      <aside className="lesson-sidebar-desktop">
-        <div style={{ padding: '0 1rem 1rem', borderBottom: '1px solid #eee', marginBottom: '0.5rem' }}>
-          <Link href={`/courses/${slug}`} style={{ fontSize: 13, color: '#666' }}>← {course.title}</Link>
-        </div>
-        <nav>
-          {/* Before-lesson pages */}
-          {beforePages.map((p) => (
-            <Link key={p.id} href={`/courses/${slug}/pages/${p.slug ?? p.id}`} style={{ textDecoration: 'none' }}>
-              <div style={{
-                padding: '8px 1rem', fontSize: 13,
-                background: p.slug === pageSlug ? '#f0f0f0' : 'transparent',
-                fontWeight: p.slug === pageSlug ? 500 : 400,
-                color: p.slug === pageSlug ? '#111' : '#444',
-                borderLeft: p.slug === pageSlug ? '3px solid #111' : '3px solid transparent',
-              }}>
-                {p.title}
-              </div>
-            </Link>
-          ))}
+    <>
+      <SiteNav />
+      <div className="lesson-viewer-layout">
+      <div className="lesson-viewer-outer">
+        <LessonSidebar
+          courseSlug={slug}
+          courseTitle={course.title}
+          lessons={allLessons}
+          modules={modules}
+          beforePages={sidebarBeforePages}
+          afterPages={sidebarAfterPages}
+          currentLessonId=""
+          currentLessonSlug={null}
+          currentPageId={page.id}
+        />
 
-          {/* Lessons divider */}
-          {allLessons && allLessons.length > 0 && (
-            <div style={{ borderTop: '1px solid #f0f0f0', margin: '4px 0' }} />
-          )}
+        <main className="lesson-main">
+          {/* Page header */}
+          <div style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              {page.page_type}
+            </div>
+            <h1 style={{ margin: 0, fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>{page.title}</h1>
+            {page.introduction && (
+              <p style={{ margin: '0.75rem 0 0', fontSize: 16, color: 'var(--text-2)', lineHeight: 1.7, fontStyle: 'italic' }}>
+                {page.introduction}
+              </p>
+            )}
+          </div>
 
-          {/* Lessons (simplified — link to first lesson) */}
-          {firstLessonHref && (
-            <Link href={firstLessonHref} style={{ textDecoration: 'none' }}>
-              <div style={{ padding: '8px 1rem', fontSize: 13, color: '#444', borderLeft: '3px solid transparent' }}>
-                Lessons ({allLessons?.length ?? 0}) →
-              </div>
-            </Link>
-          )}
+          {/* Content */}
+          <div className="lesson-content">
+            {page.content
+              ? <LessonRenderer content={page.content} />
+              : <p style={{ color: 'var(--text-3)' }}>This page has no content yet.</p>
+            }
+          </div>
 
-          {/* After-lesson pages */}
-          {afterPages.length > 0 && (
-            <div style={{ borderTop: '1px solid #f0f0f0', margin: '4px 0' }} />
-          )}
-          {afterPages.map((p) => (
-            <Link key={p.id} href={`/courses/${slug}/pages/${p.slug ?? p.id}`} style={{ textDecoration: 'none' }}>
-              <div style={{
-                padding: '8px 1rem', fontSize: 13,
-                background: p.slug === pageSlug ? '#f0f0f0' : 'transparent',
-                fontWeight: p.slug === pageSlug ? 500 : 400,
-                color: p.slug === pageSlug ? '#111' : '#444',
-                borderLeft: p.slug === pageSlug ? '3px solid #111' : '3px solid transparent',
-              }}>
-                {p.title}
-              </div>
-            </Link>
-          ))}
-        </nav>
-      </aside>
+          {/* Read toggle + prev/next */}
+          <div style={{
+            marginTop: '3rem', paddingTop: '1.5rem',
+            borderTop: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', gap: '1.25rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <CoursePageReadToggle pageId={page.id} courseId={course.id} />
+            </div>
 
-      {/* Mobile top bar */}
-      <div className="lesson-sidebar-mobile">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', borderBottom: '1px solid #eee', background: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
-          <Link href={`/courses/${slug}`} style={{ fontSize: 13, color: '#666' }}>← Back</Link>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>{page.title}</span>
-        </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              {prevItem ? (
+                <Link href={itemHref(prevItem)} style={{ minWidth: 0, maxWidth: '45vw' }}>
+                  <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'left', overflow: 'hidden' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ flexShrink: 0 }}>←</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prevItem.title}</span>
+                    </span>
+                  </button>
+                </Link>
+              ) : <div />}
+
+              {nextItem ? (
+                <Link href={itemHref(nextItem)} style={{ minWidth: 0, maxWidth: '45vw' }}>
+                  <button className="btn btn-ghost" style={{ maxWidth: '100%', textAlign: 'right', overflow: 'hidden' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextItem.title}</span>
+                      <span style={{ flexShrink: 0 }}>→</span>
+                    </span>
+                  </button>
+                </Link>
+              ) : (
+                <Link href={`/courses/${slug}`}>
+                  <button className="btn btn-primary">Back to course</button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </main>
       </div>
-
-      {/* Main content */}
-      <main className="lesson-main">
-        <h1 style={{ margin: '0 0 0.75rem', fontSize: '1.75rem' }}>{page.title}</h1>
-
-        {page.introduction && (
-          <p style={{ fontSize: 16, color: '#444', lineHeight: 1.7, margin: '0 0 2rem', fontStyle: 'italic' }}>
-            {page.introduction}
-          </p>
-        )}
-
-        {page.content ? (
-          <LessonRenderer content={page.content} />
-        ) : (
-          <p style={{ color: '#888' }}>This page has no content yet.</p>
-        )}
-
-        {/* Read/unread toggle */}
-        <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end' }}>
-          <CoursePageReadToggle pageId={page.id} courseId={course.id} />
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   )
 }
