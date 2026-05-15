@@ -65,7 +65,6 @@ const GRAPH_COLORS: Record<string, string> = {
   pink: Theme.pink,
   violet: Theme.violet,
   yellow: Theme.yellow,
-  cyan: Theme.cyan,
   black: Theme.foreground,
 }
 
@@ -106,7 +105,6 @@ export default function MafsGraph({ attrs, height = 300 }: Props) {
               key={i}
               y={f}
               color={color}
-              style="solid"
               weight={2.5}
             />
           )
