@@ -1,14 +1,18 @@
 'use client'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { useEditor, EditorContent, Node, mergeAttributes, Extension } from '@tiptap/react'
+import { useEditor, EditorContent, Node, mergeAttributes, Extension, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
 import { common, createLowlight } from 'lowlight'
 import katex from 'katex'
 import LatexModal from '@/components/LatexModal'
+import dynamic from 'next/dynamic'
 import 'katex/dist/katex.min.css'
+import type { MafsGraphAttrs } from '@/components/MafsGraph'
+
+const MafsGraph = dynamic(() => import('@/components/MafsGraph'), { ssr: false })
 
 const lowlight = createLowlight(common)
 
@@ -33,6 +37,53 @@ const BlockMath = Node.create({
   parseHTML() { return [{ tag: 'div[data-block-math]' }] },
   renderHTML({ node, HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, { 'data-block-math': node.attrs.latex }), node.attrs.latex]
+  },
+})
+
+// ── Mafs graph node ───────────────────────────────────────────────────────────
+function MafsGraphNodeView({ node, selected }: { node: { attrs: Record<string, unknown> }; selected: boolean; updateAttributes: (attrs: Record<string, unknown>) => void; deleteNode: () => void }) {
+  const attrs = node.attrs as unknown as MafsGraphAttrs
+  return (
+    <NodeViewWrapper>
+      <div style={{
+        outline: selected ? '3px solid var(--amber)' : '2px solid transparent',
+        borderRadius: 'var(--radius-lg)',
+        transition: 'outline 0.1s',
+      }}>
+        <MafsGraph attrs={attrs} />
+      </div>
+    </NodeViewWrapper>
+  )
+}
+
+const MafsGraphNode = Node.create({
+  name: 'mafsGraph',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      functions: { default: [] },
+      xMin: { default: -5 },
+      xMax: { default: 5 },
+      yMin: { default: -5 },
+      yMax: { default: 5 },
+      xStep: { default: null },
+      yStep: { default: null },
+      showGrid: { default: true },
+      label: { default: '' },
+    }
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-mafs-graph]' }]
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, {
+      'data-mafs-graph': JSON.stringify(node.attrs),
+    })]
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(MafsGraphNodeView as Parameters<typeof ReactNodeViewRenderer>[0])
   },
 })
 
@@ -72,7 +123,7 @@ const MathShortcut = Extension.create({
 })
 
 // ── Pack definitions ──────────────────────────────────────────────────────────
-export type EditorPack = 'math' | 'code'
+export type EditorPack = 'math' | 'code' | 'graph'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface TipTapEditorProps {
@@ -81,6 +132,8 @@ interface TipTapEditorProps {
   editable?: boolean
   packs?: EditorPack[]
   onEditorReady?: (insert: (doc: Record<string, unknown>) => void) => void
+  onGraphButtonClick?: () => void
+  onInsertGraph?: (insert: (attrs: MafsGraphAttrs) => void) => void
 }
 
 export default function TipTapEditor({
@@ -89,6 +142,8 @@ export default function TipTapEditor({
   editable = true,
   packs = ['math', 'code'],
   onEditorReady,
+  onGraphButtonClick,
+  onInsertGraph,
 }: TipTapEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -97,6 +152,7 @@ export default function TipTapEditor({
 
   const hasMath = packs.includes('math')
   const hasCode = packs.includes('code')
+  const hasGraph = packs.includes('graph')
 
   // ── Build extensions list based on packs ──────────────────────────────────
   const extensions = [
@@ -104,6 +160,7 @@ export default function TipTapEditor({
     Image.configure({ inline: false, allowBase64: false }),
     ...(hasCode ? [CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'python' })] : []),
     ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
+    ...(hasGraph ? [MafsGraphNode] : []),
   ]
 
   // ── Editor instance ───────────────────────────────────────────────────────
@@ -178,10 +235,21 @@ export default function TipTapEditor({
     }
   }, [editor])
 
+  const insertGraph = useCallback((attrs: MafsGraphAttrs) => {
+    if (!editor) return
+    editor.chain().focus().insertContent({ type: 'mafsGraph', attrs }).run()
+  }, [editor])
+
+  // Expose insertGraph to parent via onInsertGraph callback
+  useEffect(() => {
+    onInsertGraph?.(insertGraph)
+  }, [insertGraph, onInsertGraph])
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--surface)' }}>
       {editable && editor && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', borderBottom: '1px solid #eee', background: '#fafafa' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
           <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>B</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>I</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
@@ -205,10 +273,13 @@ export default function TipTapEditor({
           {hasMath && (
             <ToolbarButton onClick={() => setShowLatexModal(true)} active={false}>∑ Formula</ToolbarButton>
           )}
+          {hasGraph && (
+            <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>📈 Graph</ToolbarButton>
+          )}
           {hasMath && (
             <>
-              <span style={{ width: 1, background: '#ddd', margin: '0 4px' }} />
-              <span style={{ fontSize: 12, color: '#888', alignSelf: 'center' }}>
+              <span style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
+              <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
                 $x^2$ or $$x^2$$ then Space
               </span>
             </>
@@ -234,18 +305,18 @@ export default function TipTapEditor({
         .tiptap h3 { font-size: 1.15rem; margin: 1.25rem 0 0.5rem; }
         .tiptap p { margin: 0 0 0.75rem; }
         .tiptap ul, .tiptap ol { padding-left: 1.5rem; margin: 0 0 0.75rem; }
-        .tiptap blockquote { border-left: 3px solid #ddd; margin: 0 0 0.75rem; padding-left: 1rem; color: #555; }
+        .tiptap blockquote { border-left: 3px solid var(--border); margin: 0 0 0.75rem; padding-left: 1rem; color: var(--text-2); }
         .tiptap pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0 0 0.75rem; font-size: 13px; }
-        .tiptap code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 13px; }
+        .tiptap code { background: var(--surface-2); padding: 2px 5px; border-radius: 3px; font-size: 13px; }
         .tiptap pre code { background: none; padding: 0; }
         .tiptap [data-block-math] { text-align: center; margin: 1rem 0; cursor: pointer; padding: 4px 8px; border-radius: 4px; border: 2px solid transparent; }
-        .tiptap [data-block-math]:hover { border-color: #ddd; }
-        .tiptap .ProseMirror-selectednode[data-block-math] { outline: 2px solid #4a90e2; border-radius: 4px; background: #f0f7ff; }
+        .tiptap [data-block-math]:hover { border-color: var(--border); }
+        .tiptap .ProseMirror-selectednode[data-block-math] { outline: 3px solid var(--amber); border-radius: 4px; }
         .tiptap [data-inline-math] { display: inline; cursor: pointer; border-radius: 3px; border: 1px solid transparent; padding: 0 2px; }
-        .tiptap [data-inline-math]:hover { border-color: #ddd; }
-        .tiptap .ProseMirror-selectednode[data-inline-math] { outline: 2px solid #4a90e2; border-radius: 3px; background: #f0f7ff; }
+        .tiptap [data-inline-math]:hover { border-color: var(--border); }
+        .tiptap .ProseMirror-selectednode[data-inline-math] { outline: 3px solid var(--amber); border-radius: 3px; }
         .tiptap img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5rem 0; display: block; }
-        .tiptap img.ProseMirror-selectednode { outline: 2px solid #4a90e2; }
+        .tiptap img.ProseMirror-selectednode { outline: 3px solid var(--amber); }
       `}</style>
     </div>
   )
@@ -263,8 +334,10 @@ function ToolbarButton({ onClick, active, children }: {
       style={{
         padding: '3px 8px', fontSize: 12,
         fontWeight: active ? 600 : 400,
-        border: '1px solid #ddd', borderRadius: 4,
-        background: active ? '#e8e8e8' : 'white',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        background: active ? 'var(--surface-3, var(--border))' : 'var(--surface)',
+        color: active ? 'var(--text)' : 'var(--text-2)',
         cursor: 'pointer',
       }}
     >

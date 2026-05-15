@@ -16,6 +16,7 @@ A custom online course platform built with Next.js, Clerk, Supabase, and Stripe.
 | Email | Resend (planned) |
 | Rich text editor | TipTap |
 | Math rendering | KaTeX |
+| Graph rendering | Mafs |
 | Code highlighting | Lowlight |
 | Theming | next-themes (light/dark mode) |
 
@@ -88,7 +89,18 @@ For local development, use [ngrok](https://ngrok.com) to expose localhost and us
 
 5. Enable SSL: **Database → Settings → SSL Configuration**
 
-### 5. Run
+### 5. Configure next.config.js
+
+Ensure `mafs` is included in `transpilePackages` (required because mafs ships as ESM):
+
+```js
+const nextConfig = {
+  transpilePackages: ["mafs"],
+  // ...rest of config
+}
+```
+
+### 6. Run
 
 ```bash
 npm run dev
@@ -147,6 +159,8 @@ src/
 │   ├── SlidesViewer.tsx                    # PDF and Google Slides embed
 │   ├── SlidesSection.tsx                   # Client boundary for slides viewer
 │   ├── CoursePageReadToggle.tsx            # Student read progress tracking
+│   ├── MafsGraph.tsx                      # Mafs graph renderer — used in editor and student view
+│   ├── MafsGraphEditor.tsx                # Instructor graph authoring modal with live preview
 │   ├── MarkCompleteButton.tsx              # Lesson completion toggle
 │   ├── ModuleProgressBars.tsx              # Per-module progress bar UI
 │   ├── CourseProgressLoader.tsx            # Fetches and renders progress on course detail

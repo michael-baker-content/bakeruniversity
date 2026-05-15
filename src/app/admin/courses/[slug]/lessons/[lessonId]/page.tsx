@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import QuizEditor from '@/components/QuizEditor'
 import MarkdownImport from '@/components/MarkdownImport'
+import type { MafsGraphAttrs } from '@/components/MafsGraph'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
+const MafsGraphEditor = dynamic(() => import('@/components/MafsGraphEditor'), { ssr: false })
 
 const INTRO_TYPES = ['introduction', 'conclusion']
 
@@ -27,6 +29,8 @@ export default function EditLessonPage() {
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
+  const insertGraphRef = useRef<((attrs: MafsGraphAttrs) => void) | null>(null)
+  const [showGraphEditor, setShowGraphEditor] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
@@ -201,9 +205,12 @@ export default function EditLessonPage() {
           {ready && (
             <TipTapEditor
               key="lesson-editor"
+              packs={['math', 'code', 'graph']}
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
               onEditorReady={(fn) => { insertFnRef.current = fn }}
+              onGraphButtonClick={() => setShowGraphEditor(true)}
+              onInsertGraph={(fn) => { insertGraphRef.current = fn }}
             />
           )}
         </div>
@@ -319,6 +326,16 @@ export default function EditLessonPage() {
           {deleting ? 'Deleting…' : 'Delete lesson'}
         </button>
       </div>
+      {/* Graph editor modal — lives at page level to avoid re-render instability */}
+      {showGraphEditor && (
+        <MafsGraphEditor
+          onSave={(attrs) => {
+            insertGraphRef.current?.(attrs)
+            setShowGraphEditor(false)
+          }}
+          onClose={() => setShowGraphEditor(false)}
+        />
+      )}
     </main>
   )
 }

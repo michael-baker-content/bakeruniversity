@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next'
 
-const nextConfig: NextConfig = {
-  // No experimental flags needed — serverActions is stable in Next.js 16
+const nextConfig = {
+  transpilePackages: ['mafs'],
+  // ...rest of your existing config
 }
 
 export default nextConfig
