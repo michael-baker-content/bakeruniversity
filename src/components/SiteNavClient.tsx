@@ -1,5 +1,7 @@
 'use client'
 
+import BakerversityLogo from '@/components/BakerversityLogo'
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/nextjs'
@@ -43,19 +45,7 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
 
           {/* Group 1 — Logo */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 7, textDecoration: 'none', flexShrink: 0 }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 26,
-              height: 26,
-              background: 'var(--amber)',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: 13,
-              fontWeight: 700,
-              color: 'var(--amber-text)',
-              fontFamily: 'var(--font-serif)',
-            }}>B</span>
+            <BakerversityLogo size={26} />
             <span style={{
               fontFamily: 'var(--font-serif)',
               fontSize: '1rem',
