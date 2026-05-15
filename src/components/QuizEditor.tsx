@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import LatexModal from '@/components/LatexModal'
+import { LATEX_CATEGORIES } from '@/components/LatexModal'
 
 interface Question {
   id: string
