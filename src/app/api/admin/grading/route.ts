@@ -55,9 +55,9 @@ export async function GET() {
 
   // Filter to only this instructor's courses
   const myAttempts = attempts.filter((a: Record<string, unknown>) => {
-    const quiz = a.quizzes as Record<string, unknown>
-    const lesson = quiz.lessons as Record<string, unknown>
-    const course = lesson.courses as Record<string, unknown>
+    const quiz = a.quizzes as unknown as Record<string, unknown>
+    const lesson = quiz.lessons as unknown as Record<string, unknown>
+    const course = lesson.courses as unknown as Record<string, unknown>
     return course.instructor_id === user.id
   })
 
@@ -65,7 +65,7 @@ export async function GET() {
   const results = []
 
   for (const attempt of myAttempts) {
-    const quiz = attempt.quizzes as Record<string, unknown>
+    const quiz = attempt.quizzes as unknown as Record<string, unknown>
     const quizId = quiz.id as string
     const answers = attempt.answers as Record<string, string>
 
@@ -93,9 +93,9 @@ export async function GET() {
       (feedbackRows ?? []).map((f) => [f.question_id, f])
     )
 
-    const lesson = quiz.lessons as Record<string, unknown>
-    const course = lesson.courses as Record<string, unknown>
-    const student = attempt.users as Record<string, unknown>
+    const lesson = quiz.lessons as unknown as Record<string, unknown>
+    const course = lesson.courses as unknown as Record<string, unknown>
+    const student = attempt.users as unknown as Record<string, unknown>
 
     results.push({
       attempt_id: attempt.id,
