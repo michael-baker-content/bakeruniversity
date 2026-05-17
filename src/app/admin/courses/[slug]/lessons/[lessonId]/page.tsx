@@ -10,6 +10,7 @@ import type { MafsGraphAttrs } from '@/components/MafsGraph'
 
 const TipTapEditor = dynamic(() => import('@/components/TipTapEditor'), { ssr: false })
 const MafsGraphEditor = dynamic(() => import('@/components/MafsGraphEditor'), { ssr: false })
+const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
 
 const INTRO_TYPES = ['introduction', 'conclusion']
 
@@ -30,7 +31,9 @@ export default function EditLessonPage() {
   const [ready, setReady] = useState(false)
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const insertGraphRef = useRef<((attrs: MafsGraphAttrs) => void) | null>(null)
+  const insertLatexRef = useRef<((latex: string, displayMode: boolean) => void) | null>(null)
   const [showGraphEditor, setShowGraphEditor] = useState(false)
+  const [showLatexModal, setShowLatexModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
@@ -211,6 +214,8 @@ export default function EditLessonPage() {
               onEditorReady={(fn) => { insertFnRef.current = fn }}
               onGraphButtonClick={() => setShowGraphEditor(true)}
               onInsertGraph={(fn) => { insertGraphRef.current = fn }}
+              onLatexButtonClick={() => setShowLatexModal(true)}
+              onInsertLatex={(fn) => { insertLatexRef.current = fn }}
             />
           )}
         </div>
@@ -305,10 +310,7 @@ export default function EditLessonPage() {
       </form>
 
       {ready && courseId && lessonUuid && (
-        <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', margin: '0 0 1.25rem' }}>Quiz</h2>
-          <QuizEditor courseId={courseId} lessonId={lessonUuid} />
-        </div>
+        <QuizEditor courseId={courseId} lessonId={lessonUuid} />
       )}
 
       {/* Delete */}
@@ -326,6 +328,17 @@ export default function EditLessonPage() {
           {deleting ? 'Deleting…' : 'Delete lesson'}
         </button>
       </div>
+      {/* Latex modal — lives at page level to avoid re-render instability */}
+      {showLatexModal && (
+        <LatexModal
+          onInsert={(latex, displayMode) => {
+            insertLatexRef.current?.(latex, displayMode)
+          }}
+          onClose={() => setShowLatexModal(false)}
+          showDisplayToggle
+        />
+      )}
+
       {/* Graph editor modal — lives at page level to avoid re-render instability */}
       {showGraphEditor && (
         <MafsGraphEditor

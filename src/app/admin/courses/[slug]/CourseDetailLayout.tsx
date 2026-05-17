@@ -12,6 +12,7 @@ interface Page {
   page_type: string
   module_id: string | null
   is_published: boolean
+  introduction: string | null
 }
 
 interface Module {
@@ -30,53 +31,15 @@ interface Lesson {
 }
 
 interface Props {
-  course: { id: string; slug: string }
+  course: { id: string; slug: string; intro_description: string | null; conclusion_description: string | null }
   modules: Module[]
   pages: Page[]
   lessons: Lesson[]
 }
 
-function PageRow({ page, courseSlug, courseId }: { page: Page; courseSlug: string; courseId: string }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: 10,
-      padding: '9px 14px',
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      flexWrap: 'wrap',
-    }}>
-      <span style={{ fontSize: 14, flexShrink: 0, paddingTop: 1 }}>📄</span>
-      <span style={{ flex: 1, fontSize: 14, color: 'var(--text)', fontWeight: 500, minWidth: 80 }}>
-        {page.title}
-        {!page.is_published && (
-          <span style={{
-            display: 'inline-block', marginLeft: 8,
-            fontSize: 11, fontWeight: 600, padding: '1px 7px',
-            borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)',
-          }}>Draft</span>
-        )}
-      </span>
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
-        {page.slug && (
-          <Link href={`/courses/${courseSlug}/pages/${page.slug}`} target="_blank">
-            <button className="btn btn-ghost btn-sm">Preview ↗</button>
-          </Link>
-        )}
-        <Link href={`/admin/courses/${courseSlug}/pages/${page.id}`}>
-          <button className="btn btn-ghost btn-sm">Edit</button>
-        </Link>
-        <DeleteButton
-          url={`/api/admin/courses/${courseId}/pages/${page.id}`}
-          confirm={`Delete "${page.title}"? This cannot be undone.`}
-        />
-      </div>
-    </div>
-  )
-}
-
 function CollapsibleSection({
   id, title, description, courseSlug, courseId,
-  pages, lessons, modules, allModules, allLessons,
+  lessons, allModules,
   defaultOpen = true,
 }: {
   id: string
@@ -84,11 +47,8 @@ function CollapsibleSection({
   description?: string | null
   courseSlug: string
   courseId: string
-  pages: Page[]
   lessons: Lesson[]
-  modules: Module[]
   allModules: Module[]
-  allLessons: Lesson[]
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -102,79 +62,59 @@ function CollapsibleSection({
     }}>
       {/* Module header */}
       <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8,
         padding: '12px 16px',
         background: 'var(--surface-2)',
         borderBottom: open ? '1px solid var(--border)' : 'none',
-        flexWrap: 'wrap',
       }}>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 0', flexShrink: 0,
-          }}
-        >
-          {open ? '▼' : '▶'}
-        </button>
-        <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
-          {description && (
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{description}</div>
-          )}
+        {/* Title + buttons row */}
+        <div className="module-header-row" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          flexWrap: 'wrap',
+        }}>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 11, color: 'var(--text-3)', padding: '2px 4px', flexShrink: 0,
+            }}
+          >
+            {open ? '▼' : '▶'}
+          </button>
+          <div className="module-header-title" style={{ fontWeight: 700, fontSize: 14, flex: 1, minWidth: 80 }}>{title}</div>
+          <div className="module-header-buttons">
+            <Link href={`/admin/courses/${courseSlug}/lessons/new?module=${id}`}>
+              <button className="btn btn-ghost btn-sm">+ Lesson</button>
+            </Link>
+            <Link href={`/admin/courses/${courseSlug}/modules/${id}`}>
+              <button className="btn btn-ghost btn-sm">Edit</button>
+            </Link>
+            <DeleteButton
+              url={`/api/admin/courses/${courseId}/modules/${id}`}
+              confirm={`Delete module "${title}"? Its lessons will become unassigned.`}
+            />
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
-          <Link href={`/admin/courses/${courseSlug}/pages/new?module=${id}`}>
-            <button className="btn btn-ghost btn-sm">+ Page</button>
-          </Link>
-          <Link href={`/admin/courses/${courseSlug}/lessons/new?module=${id}`}>
-            <button className="btn btn-ghost btn-sm">+ Lesson</button>
-          </Link>
-          <Link href={`/admin/courses/${courseSlug}/modules/${id}`}>
-            <button className="btn btn-ghost btn-sm">Edit</button>
-          </Link>
-          <DeleteButton
-            url={`/api/admin/courses/${courseId}/modules/${id}`}
-            confirm={`Delete module "${title}"? Its lessons and pages will become unassigned.`}
-          />
-        </div>
+        {/* Description on its own full-width row */}
+        {description && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, paddingLeft: 22 }}>
+            {description}
+          </div>
+        )}
       </div>
 
       {open && (
-        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--surface)' }}>
-          {/* Pages in this module */}
-          {pages.length > 0 && (
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
-                Pages
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {pages.map((page) => (
-                  <PageRow key={page.id} page={page} courseSlug={courseSlug} courseId={courseId} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Lessons in this module */}
+        <div style={{ padding: '1rem', background: 'var(--surface)' }}>
           {lessons.length > 0 ? (
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
-                Lessons
-              </p>
-              <LessonList
-                lessons={lessons}
-                modules={allModules}
-                courseId={courseId}
-                courseSlug={courseSlug}
-              />
-            </div>
+            <LessonList
+              lessons={lessons}
+              modules={allModules}
+              courseId={courseId}
+              courseSlug={courseSlug}
+            />
           ) : (
-            pages.length === 0 && (
-              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
-                No content yet. Add a page or lesson above.
-              </p>
-            )
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+              No lessons yet. Add one above.
+            </p>
           )}
         </div>
       )}
@@ -184,13 +124,37 @@ function CollapsibleSection({
 
 const INTRO_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
 
-function CourseLevelSection({ label, pages, courseSlug, courseId }: {
+function CourseLevelSection({ label, description, pages: initialPages, courseSlug, courseId }: {
   label: string
+  description?: string | null
   pages: Page[]
   courseSlug: string
   courseId: string
 }) {
   const [open, setOpen] = useState(true)
+  const [pages, setPages] = useState<Page[]>(initialPages)
+  const [moving, setMoving] = useState<string | null>(null)
+
+  const move = async (pageId: string, direction: 'up' | 'down') => {
+    const index = pages.findIndex((p) => p.id === pageId)
+    const swapIndex = direction === 'up' ? index - 1 : index + 1
+    if (swapIndex < 0 || swapIndex >= pages.length) return
+
+    setMoving(pageId)
+    const reordered = [...pages]
+    const temp = reordered[index]
+    reordered[index] = reordered[swapIndex]
+    reordered[swapIndex] = temp
+    const withPositions = reordered.map((p, i) => ({ ...p, position: i }))
+    setPages(withPositions)
+
+    await fetch(`/api/admin/courses/${courseId}/pages/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pages: withPositions.map(({ id, position }) => ({ id, position })) }),
+    })
+    setMoving(null)
+  }
 
   return (
     <div style={{
@@ -200,27 +164,91 @@ function CourseLevelSection({ label, pages, courseSlug, courseId }: {
       marginBottom: '1rem',
     }}>
       <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8,
         padding: '12px 16px',
         background: 'var(--surface-2)',
         borderBottom: open ? '1px solid var(--border)' : 'none',
-        flexWrap: 'wrap',
       }}>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 0', flexShrink: 0 }}
-        >
-          {open ? '▼' : '▶'}
-        </button>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text)', minWidth: 80 }}>{label}</span>
-        <Link href={`/admin/courses/${courseSlug}/pages/new`}>
-          <button className="btn btn-ghost btn-sm">+ Page</button>
-        </Link>
+        {/* Section header — never wraps */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', padding: '2px 4px', flexShrink: 0 }}
+          >
+            {open ? '▼' : '▶'}
+          </button>
+          <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{label}</div>
+          <Link href={`/admin/courses/${courseSlug}/pages/new`}>
+            <button className="btn btn-ghost btn-sm">+ Page</button>
+          </Link>
+        </div>
+        {description && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, paddingLeft: 22, lineHeight: 1.5 }}>
+            {description}
+          </div>
+        )}
       </div>
+
       {open && (
-        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--surface)' }}>
-          {pages.map((page) => (
-            <PageRow key={page.id} page={page} courseSlug={courseSlug} courseId={courseId} />
+        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface)' }}>
+          {pages.map((page, index) => (
+            <div key={page.id} style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '0.75rem 1rem',
+              opacity: moving === page.id ? 0.5 : 1,
+              transition: 'opacity 0.15s',
+            }}>
+              {/* Title + buttons on one row, buttons wrap below at narrow widths */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+                  <button
+                    onClick={() => move(page.id, 'up')}
+                    disabled={index === 0 || !!moving}
+                    style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
+                    title="Move up"
+                  >▲</button>
+                  <button
+                    onClick={() => move(page.id, 'down')}
+                    disabled={index === pages.length - 1 || !!moving}
+                    style={{ background: 'none', border: 'none', cursor: index === pages.length - 1 ? 'default' : 'pointer', opacity: index === pages.length - 1 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
+                    title="Move down"
+                  >▼</button>
+                </div>
+
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--text)', minWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {page.title}
+                </span>
+
+                {!page.is_published && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '1px 7px',
+                    borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-3)', flexShrink: 0,
+                  }}>Draft</span>
+                )}
+
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  {page.slug && (
+                    <Link href={`/courses/${courseSlug}/pages/${page.slug}`} target="_blank">
+                      <button className="btn btn-ghost btn-sm"><span className="preview-btn-label">Preview </span>↗</button>
+                    </Link>
+                  )}
+                  <Link href={`/admin/courses/${courseSlug}/pages/${page.id}`}>
+                    <button className="btn btn-ghost btn-sm">Edit</button>
+                  </Link>
+                  <DeleteButton
+                    url={`/api/admin/courses/${courseId}/pages/${page.id}`}
+                    confirm={`Delete "${page.title}"? This cannot be undone.`}
+                  />
+                </div>
+              </div>
+
+              {/* Description below */}
+              {page.introduction && (
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6, paddingLeft: 28, lineHeight: 1.5 }}>
+                  {page.introduction}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -244,7 +272,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons }: 
         marginBottom: '1.5rem', flexWrap: 'wrap',
       }}>
         <Link href={`/admin/courses/${course.slug}/modules/new`}>
-          <button className="btn btn-outline btn-sm">+ Add module</button>
+          <button className="btn btn-ghost btn-sm">+ Add module</button>
         </Link>
         <Link href={`/admin/courses/${course.slug}/pages/new`}>
           <button className="btn btn-ghost btn-sm">+ Add page</button>
@@ -268,6 +296,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons }: 
       {introductionPages.length > 0 && (
         <CourseLevelSection
           label="Introduction"
+          description={course.intro_description}
           pages={introductionPages}
           courseSlug={course.slug}
           courseId={course.id}
@@ -283,11 +312,8 @@ export default function CourseDetailLayout({ course, modules, pages, lessons }: 
           description={mod.description}
           courseSlug={course.slug}
           courseId={course.id}
-          pages={pages.filter((p) => p.module_id === mod.id)}
           lessons={lessons.filter((l) => l.module_id === mod.id)}
-          modules={modules}
           allModules={modules}
-          allLessons={lessons}
         />
       ))}
 
@@ -295,6 +321,7 @@ export default function CourseDetailLayout({ course, modules, pages, lessons }: 
       {conclusionPages.length > 0 && (
         <CourseLevelSection
           label="Conclusion"
+          description={course.conclusion_description}
           pages={conclusionPages}
           courseSlug={course.slug}
           courseId={course.id}

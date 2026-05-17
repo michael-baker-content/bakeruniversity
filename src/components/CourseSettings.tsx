@@ -9,11 +9,13 @@ interface Props {
   slug: string
   priceCents: number
   thumbnailUrl: string | null
+  introDescription: string | null
+  conclusionDescription: string | null
 }
 
-export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl }: Props) {
+export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl, introDescription, conclusionDescription }: Props) {
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title, description, slug, priceCents })
+  const [form, setForm] = useState({ title, description, slug, priceCents, introDescription: introDescription ?? '', conclusionDescription: conclusionDescription ?? '' })
   const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -53,6 +55,8 @@ export default function CourseSettings({ courseId, title, description, slug, pri
           slug: form.slug,
           price_cents: form.priceCents,
           thumbnail_url: thumbnail,
+          intro_description: form.introDescription || null,
+          conclusion_description: form.conclusionDescription || null,
         }),
       })
       if (!res.ok) {
@@ -117,6 +121,28 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                   value={form.description}
                   onChange={(e) => set('description', e.target.value)}
                   rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              </label>
+
+              <label>
+                <span style={labelStyle}>Introduction section description <span style={{ fontWeight: 400, color: 'var(--text-3)', fontSize: 11 }}>(optional)</span></span>
+                <textarea
+                  value={form.introDescription}
+                  onChange={(e) => set('introDescription', e.target.value)}
+                  rows={2}
+                  placeholder="Describe what students will find in the introduction…"
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              </label>
+
+              <label>
+                <span style={labelStyle}>Conclusion section description <span style={{ fontWeight: 400, color: 'var(--text-3)', fontSize: 11 }}>(optional)</span></span>
+                <textarea
+                  value={form.conclusionDescription}
+                  onChange={(e) => set('conclusionDescription', e.target.value)}
+                  rows={2}
+                  placeholder="Describe what students will find in the conclusion…"
                   style={{ ...inputStyle, resize: 'vertical' }}
                 />
               </label>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -68,6 +68,11 @@ const LATEX_CATEGORIES = [
 
 export { LATEX_CATEGORIES }
 
+function renderLatex(latex: string, displayMode: boolean): string {
+  try { return katex.renderToString(latex, { throwOnError: false, displayMode }) }
+  catch { return latex }
+}
+
 export default function LatexModal({
   onInsert,
   onClose,
@@ -79,102 +84,204 @@ export default function LatexModal({
 }) {
   const [activeCategory, setActiveCategory] = useState(0)
   const [displayMode, setDisplayMode] = useState(false)
+  const [editableLatex, setEditableLatex] = useState('')
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewError, setPreviewError] = useState('')
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Update preview whenever editableLatex or displayMode changes
+  useEffect(() => {
+    if (!editableLatex.trim()) {
+      setPreviewHtml('')
+      setPreviewError('')
+      return
+    }
+    try {
+      const html = katex.renderToString(editableLatex, { throwOnError: true, displayMode })
+      setPreviewHtml(html)
+      setPreviewError('')
+    } catch (e) {
+      setPreviewHtml('')
+      setPreviewError((e as Error).message.replace(/KaTeX parse error: /, ''))
+    }
+  }, [editableLatex, displayMode])
+
+  function selectFormula(latex: string) {
+    setEditableLatex(latex)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  function handleInsert() {
+    if (!editableLatex.trim()) return
+    onInsert(editableLatex.trim(), displayMode)
+    onClose()
+  }
 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 1000, padding: '1rem',
       }}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
         style={{
-          background: 'white', borderRadius: 10, width: 560, maxWidth: '95vw',
-          maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          width: '100%', maxWidth: 600,
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Algebra 1 LaTeX Formulas</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#888', lineHeight: 1 }}>×</button>
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>Insert formula</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', lineHeight: 1 }}>×</button>
         </div>
 
         {/* Category tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #eee', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', overflowX: 'auto', flexShrink: 0 }}>
           {LATEX_CATEGORIES.map((cat, i) => (
-            <button key={i} onClick={() => setActiveCategory(i)} style={{
-              padding: '8px 14px', fontSize: 13, border: 'none', background: 'none',
-              borderBottom: `2px solid ${activeCategory === i ? '#111' : 'transparent'}`,
-              fontWeight: activeCategory === i ? 600 : 400,
-              color: activeCategory === i ? '#111' : '#666',
-              cursor: 'pointer', whiteSpace: 'nowrap',
-            }}>
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActiveCategory(i)}
+              style={{
+                padding: '8px 14px', fontSize: 13, border: 'none', background: 'none',
+                borderBottom: `2px solid ${activeCategory === i ? 'var(--indigo)' : 'transparent'}`,
+                fontWeight: activeCategory === i ? 600 : 400,
+                color: activeCategory === i ? 'var(--text)' : 'var(--text-2)',
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
               {cat.label}
             </button>
           ))}
         </div>
 
-        {/* Formula grid */}
-        <div style={{ padding: '1rem', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {/* Formula grid — click to load into editor */}
+        <div style={{
+          padding: '0.75rem',
+          overflowY: 'auto',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 6,
+          flexShrink: 1,
+        }}>
           {LATEX_CATEGORIES[activeCategory].formulas.map((f, i) => {
-            const rendered = (() => {
-              try { return katex.renderToString(f.latex, { throwOnError: false, displayMode: false }) }
-              catch { return f.latex }
-            })()
+            const rendered = renderLatex(f.latex, false)
             return (
               <button
                 key={i}
-                onClick={() => { onInsert(f.latex, displayMode); onClose() }}
+                type="button"
+                onClick={() => selectFormula(f.latex)}
                 style={{
-                  padding: '10px 12px', border: '1px solid #eee', borderRadius: 8,
-                  background: 'white', cursor: 'pointer', textAlign: 'left',
-                  display: 'flex', flexDirection: 'column', gap: 4,
+                  padding: '8px 10px',
+                  border: `1px solid ${editableLatex === f.latex ? 'var(--indigo)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius)',
+                  background: editableLatex === f.latex ? 'var(--indigo-muted, var(--surface-2))' : 'var(--surface)',
+                  cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', flexDirection: 'column', gap: 3,
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#999')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#eee')}
               >
-                <span style={{ fontSize: 11, color: '#aaa' }}>{f.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{f.label}</span>
                 <span dangerouslySetInnerHTML={{ __html: rendered }} />
               </button>
             )
           })}
         </div>
 
-        {/* Display mode toggle — only shown in TipTap editor context */}
-        {showDisplayToggle && (
-          <div style={{
-            padding: '0.75rem 1.25rem',
-            borderTop: '1px solid #eee',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: '#fafafa',
-          }}>
-            <span style={{ fontSize: 13, color: '#555' }}>Insert as:</span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-              <input
-                type="radio"
-                name="displayMode"
-                checked={!displayMode}
-                onChange={() => setDisplayMode(false)}
-              />
-              Inline <span style={{ color: '#aaa', fontSize: 12 }}>($...$)</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-              <input
-                type="radio"
-                name="displayMode"
-                checked={displayMode}
-                onChange={() => setDisplayMode(true)}
-              />
-              Block <span style={{ color: '#aaa', fontSize: 12 }}>($$...$$)</span>
-            </label>
+        {/* Edit + preview area */}
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface-2)',
+          flexShrink: 0,
+        }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>
+            Edit LaTeX
+          </label>
+          <textarea
+            ref={inputRef}
+            value={editableLatex}
+            onChange={(e) => setEditableLatex(e.target.value)}
+            placeholder="Select a formula above or type LaTeX directly…"
+            rows={2}
+            style={{
+              width: '100%',
+              padding: '7px 10px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontSize: 13,
+              fontFamily: 'monospace',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                handleInsert()
+              }
+            }}
+          />
+
+          {/* Live preview */}
+          {previewError ? (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--danger)', fontFamily: 'monospace' }}>
+              {previewError}
+            </div>
+          ) : previewHtml ? (
+            <div
+              style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', minHeight: 32, textAlign: displayMode ? 'center' : 'left' }}
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+          ) : null}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderTop: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+          flexWrap: 'wrap',
+        }}>
+          {showDisplayToggle && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Insert as:</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 13 }}>
+                <input type="radio" name="lm-displayMode" checked={!displayMode} onChange={() => setDisplayMode(false)} />
+                Inline
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 13 }}>
+                <input type="radio" name="lm-displayMode" checked={displayMode} onChange={() => setDisplayMode(true)} />
+                Block
+              </label>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <button type="button" onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
+            <button
+              type="button"
+              onClick={handleInsert}
+              disabled={!editableLatex.trim() || !!previewError}
+              className="btn btn-primary btn-sm"
+            >
+              Insert
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

@@ -30,17 +30,15 @@ export default function PublishToggle({
     <button
       onClick={toggle}
       disabled={loading}
-      style={{
-        padding: '6px 12px',
-        fontSize: 13,
-        border: '1px solid #ddd',
-        borderRadius: 6,
-        background: published ? '#dcfce7' : 'white',
-        color: published ? '#166534' : '#111',
-        cursor: 'pointer',
-      }}
+      className="btn btn-ghost btn-sm"
+      style={published ? {
+        background: 'var(--success-bg)',
+        color: 'var(--success)',
+        borderColor: 'var(--success)',
+        fontWeight: 600,
+      } : { fontWeight: 500 }}
     >
-      {loading ? '...' : published ? 'Published' : 'Publish'}
+      {loading ? '…' : published ? 'Published' : 'Publish'}
     </button>
   )
 }

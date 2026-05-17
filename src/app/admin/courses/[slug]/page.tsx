@@ -6,7 +6,6 @@ import type { Metadata } from 'next'
 import PublishToggle from './PublishToggle'
 import EnrollSelfButton from '@/components/EnrollSelfButton'
 import CourseSettings from '@/components/CourseSettings'
-import CourseProgressLoader from '@/components/CourseProgressLoader'
 import CourseDetailLayout from './CourseDetailLayout'
 
 const supabase = createServiceClient()
@@ -36,7 +35,7 @@ export default async function AdminCourseDetailPage({
 
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, slug, description, is_published, price_cents, thumbnail_url')
+    .select('id, title, slug, description, is_published, price_cents, thumbnail_url, intro_description, conclusion_description')
     .eq('slug', slug)
     .single()
 
@@ -54,7 +53,7 @@ export default async function AdminCourseDetailPage({
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('course_pages')
-      .select('id, title, slug, page_type, module_id, is_published, position')
+      .select('id, title, slug, page_type, module_id, is_published, position, introduction')
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase.from('lessons')
@@ -73,12 +72,23 @@ export default async function AdminCourseDetailPage({
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      {/* Course header */}
-      <div style={{ marginBottom: '2rem' }}>
+      {/* Course title and meta */}
+      <div style={{ marginBottom: '1.75rem' }}>
         <h1 style={{ margin: '0 0 0.25rem', fontFamily: 'var(--font-serif)' }}>{course.title}</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 1rem' }}>
-          /courses/{course.slug} · {course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
-          {enrollmentCount !== null && ` · ${enrollmentCount} enrolled`}
+        <div style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+          <span>/courses/{course.slug}</span>
+          <span className="meta-wrap"> · {course.price_cents === 0 ? 'Free' : `$${(course.price_cents / 100).toFixed(2)}`}
+          {enrollmentCount !== null && ` · ${enrollmentCount} enrolled`}</span>
+        </div>
+      </div>
+
+      {/* Course management */}
+      <div style={{ marginBottom: '2.5rem' }}>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>
+          Course management
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 0.875rem' }}>
+          Publish, configure settings, review student responses, and preview the course as a student.
         </p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <PublishToggle courseId={course.id} isPublished={course.is_published} />
@@ -90,28 +100,38 @@ export default async function AdminCourseDetailPage({
             slug={course.slug}
             priceCents={course.price_cents ?? 0}
             thumbnailUrl={course.thumbnail_url ?? null}
+            introDescription={course.intro_description ?? null}
+            conclusionDescription={course.conclusion_description ?? null}
           />
           <Link href={`/admin/grading?course=${course.id}`}>
             <button className="btn btn-ghost btn-sm">Responses</button>
           </Link>
           <Link href={`/courses/${course.slug}`} target="_blank">
-            <button className="btn btn-outline btn-sm">Preview ↗</button>
+            <button className="btn btn-ghost btn-sm">Preview ↗</button>
           </Link>
         </div>
       </div>
 
-      {/* Progress (only visible if self-enrolled) */}
-      {selfEnrollment && (
-        <CourseProgressLoader courseId={course.id} />
-      )}
-
-      {/* Module-centric content layout */}
-      <CourseDetailLayout
-        course={{ id: course.id, slug: course.slug }}
-        modules={modules ?? []}
-        pages={coursePages ?? []}
-        lessons={allLessons ?? []}
-      />
+      {/* Course content */}
+      <div>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>
+          Course content
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 1.25rem' }}>
+          Introduction and conclusion pages appear in the sidebar before and after the modules. Modules contain the lessons students work through in sequence.
+        </p>
+        <CourseDetailLayout
+          course={{
+            id: course.id,
+            slug: course.slug,
+            intro_description: course.intro_description ?? null,
+            conclusion_description: course.conclusion_description ?? null,
+          }}
+          modules={modules ?? []}
+          pages={coursePages ?? []}
+          lessons={allLessons ?? []}
+        />
+      </div>
     </main>
   )
 }

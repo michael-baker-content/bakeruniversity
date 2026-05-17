@@ -7,7 +7,6 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
 import { common, createLowlight } from 'lowlight'
 import katex from 'katex'
-import LatexModal from '@/components/LatexModal'
 import dynamic from 'next/dynamic'
 import 'katex/dist/katex.min.css'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
@@ -94,24 +93,32 @@ const MathShortcut = Extension.create({
     const handleMath = () => {
       const { state } = this.editor
       const { from } = state.selection
-      const textBefore = state.doc.textBetween(Math.max(0, from - 200), from)
+      const textBefore = state.doc.textBetween(Math.max(0, from - 300), from)
 
-      const blockMatch = textBefore.match(/\$\$([^$]+)\$\$$/)
+      // Block math: $$...$$ — must be at start of paragraph or after whitespace
+      const blockMatch = textBefore.match(/\$\$([\s\S]+?)\$\$$/)
       if (blockMatch) {
-        this.editor.chain()
-          .deleteRange({ from: from - blockMatch[0].length, to: from })
-          .insertContent({ type: 'blockMath', attrs: { latex: blockMatch[1].trim() } })
-          .run()
-        return true
+        const latex = blockMatch[1].trim()
+        if (latex) {
+          this.editor.chain()
+            .deleteRange({ from: from - blockMatch[0].length, to: from })
+            .insertContent({ type: 'blockMath', attrs: { latex } })
+            .run()
+          return true
+        }
       }
 
-      const inlineMatch = textBefore.match(/\$([^$]+)\$$/)
+      // Inline math: $...$ — single dollar signs
+      const inlineMatch = textBefore.match(/\$([^$\n]+)\$$/)
       if (inlineMatch) {
-        this.editor.chain()
-          .deleteRange({ from: from - inlineMatch[0].length, to: from })
-          .insertContent({ type: 'inlineMath', attrs: { latex: inlineMatch[1].trim() } })
-          .run()
-        return true
+        const latex = inlineMatch[1].trim()
+        if (latex) {
+          this.editor.chain()
+            .deleteRange({ from: from - inlineMatch[0].length, to: from })
+            .insertContent({ type: 'inlineMath', attrs: { latex } })
+            .run()
+          return true
+        }
       }
       return false
     }
@@ -134,6 +141,8 @@ interface TipTapEditorProps {
   onEditorReady?: (insert: (doc: Record<string, unknown>) => void) => void
   onGraphButtonClick?: () => void
   onInsertGraph?: (insert: (attrs: MafsGraphAttrs) => void) => void
+  onLatexButtonClick?: () => void
+  onInsertLatex?: (insert: (latex: string, displayMode: boolean) => void) => void
 }
 
 export default function TipTapEditor({
@@ -144,11 +153,12 @@ export default function TipTapEditor({
   onEditorReady,
   onGraphButtonClick,
   onInsertGraph,
+  onLatexButtonClick,
+  onInsertLatex,
 }: TipTapEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [showLatexModal, setShowLatexModal] = useState(false)
 
   const hasMath = packs.includes('math')
   const hasCode = packs.includes('code')
@@ -235,6 +245,11 @@ export default function TipTapEditor({
     }
   }, [editor])
 
+  // Expose insertLatexFormula to parent
+  useEffect(() => {
+    onInsertLatex?.(insertLatexFormula)
+  }, [insertLatexFormula, onInsertLatex])
+
   const insertGraph = useCallback((attrs: MafsGraphAttrs) => {
     if (!editor) return
     editor.chain().focus().insertContent({ type: 'mafsGraph', attrs }).run()
@@ -271,7 +286,7 @@ export default function TipTapEditor({
             onChange={handleFileChange}
           />
           {hasMath && (
-            <ToolbarButton onClick={() => setShowLatexModal(true)} active={false}>∑ Formula</ToolbarButton>
+            <ToolbarButton onClick={() => onLatexButtonClick?.()} active={false}>∑ Formula</ToolbarButton>
           )}
           {hasGraph && (
             <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>📈 Graph</ToolbarButton>
@@ -296,9 +311,6 @@ export default function TipTapEditor({
           style={{ padding: '1rem', fontSize: 15, lineHeight: 1.7 }}
         />
       </div>
-      {showLatexModal && (
-        <LatexModal onInsert={insertLatexFormula} onClose={() => setShowLatexModal(false)} showDisplayToggle />
-      )}
       <style>{`
         .tiptap:focus { outline: none; }
         .tiptap h2 { font-size: 1.4rem; margin: 1.5rem 0 0.5rem; }

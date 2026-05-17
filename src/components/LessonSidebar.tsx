@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { lessonHref, buildModuleSlugMap } from '@/lib/lessonUrl'
 
 interface CoursePage {
   id: string
@@ -23,6 +24,7 @@ interface SidebarModule {
   id: string
   title: string
   position: number
+  slug: string | null
 }
 
 interface LessonSidebarProps {
@@ -34,12 +36,6 @@ interface LessonSidebarProps {
   currentLessonId: string
   currentLessonSlug: string | null
   currentPageId?: string
-}
-
-function lessonHref(courseSlug: string, lesson: SidebarLesson) {
-  return lesson.slug
-    ? `/courses/${courseSlug}/lessons/${lesson.slug}`
-    : `/courses/${courseSlug}/lessons/${lesson.id}`
 }
 
 function pageHref(courseSlug: string, page: CoursePage) {
@@ -81,20 +77,59 @@ function PageLink({ href, title, active }: { href: string; title: string; active
   return (
     <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{
-        padding: '7px 1rem',
-        paddingLeft: '1.75rem',
+        padding: '4px 0.75rem',
+        paddingLeft: '1.5rem',
         fontSize: 13,
         color: active ? 'var(--text)' : 'var(--text-2)',
         fontWeight: active ? 500 : 400,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
         background: active ? 'var(--surface-2)' : 'transparent',
         borderLeft: `3px solid ${active ? 'var(--indigo)' : 'transparent'}`,
         transition: 'color 0.1s',
+        lineHeight: 1.4,
       }}>
-        <span style={{ fontSize: 9, color: 'var(--text-3)', flexShrink: 0 }}>◆</span>
         {title}
+      </div>
+    </Link>
+  )
+}
+
+function LessonLink({ href, active, number, title }: {
+  href: string
+  active: boolean
+  number: number
+  title: string
+}) {
+  return (
+    <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{
+        padding: '5px 0.75rem',
+        paddingLeft: '1.25rem',
+        display: 'grid',
+        gridTemplateColumns: '20px 1fr',
+        gap: 6,
+        alignItems: 'start',
+        background: active ? 'var(--surface-2)' : 'transparent',
+        borderLeft: `3px solid ${active ? 'var(--indigo)' : 'transparent'}`,
+        transition: 'background 0.1s',
+      }}>
+        <span style={{
+          fontSize: 10,
+          color: 'var(--text-3)',
+          fontWeight: 600,
+          paddingTop: 2,
+          lineHeight: 1.4,
+          textAlign: 'right',
+        }}>
+          {number}
+        </span>
+        <span style={{
+          fontSize: 13,
+          lineHeight: 1.4,
+          color: active ? 'var(--text)' : 'var(--text-2)',
+          fontWeight: active ? 500 : 400,
+        }}>
+          {title}
+        </span>
       </div>
     </Link>
   )
@@ -126,20 +161,36 @@ function ModuleHeader({ title, collapsed, onToggle }: {
   )
 }
 
-function SectionDivider({ label }: { label?: string }) {
+function SectionDivider({ label, collapsible, collapsed, onToggle }: {
+  label?: string
+  collapsible?: boolean
+  collapsed?: boolean
+  onToggle?: () => void
+}) {
   return (
-    <div style={{
-      padding: '8px 1rem 4px',
-      fontSize: 10,
-      fontWeight: 700,
-      color: 'var(--text-3)',
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      borderTop: '1px solid var(--border)',
-      marginTop: 4,
-    }}>
-      {label}
-    </div>
+    <button
+      onClick={collapsible ? onToggle : undefined}
+      style={{
+        width: '100%', textAlign: 'left',
+        padding: '8px 1rem 4px',
+        fontSize: 10,
+        fontWeight: 700,
+        color: 'var(--text-3)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em',
+        marginTop: 4,
+        background: 'none',
+        border: 'none',
+        borderTop: '1px solid var(--border)',
+        cursor: collapsible ? 'pointer' : 'default',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      <span>{label}</span>
+      {collapsible && <span style={{ fontSize: 8 }}>{collapsed ? '▶' : '▼'}</span>}
+    </button>
   )
 }
 
@@ -149,7 +200,29 @@ function SidebarContent({
   courseSlug, courseTitle, lessons, modules, pages,
   currentLessonId, currentLessonSlug, currentPageId, onNavClick,
 }: LessonSidebarProps & { onNavClick?: () => void }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const moduleSlugMap = buildModuleSlugMap(modules)
+
+  // Find which module the current lesson belongs to
+  const currentLesson = lessons.find((l) =>
+    l.id === currentLessonId || (currentLessonSlug && l.slug === currentLessonSlug)
+  )
+  const activeModuleId = currentLesson?.module_id ?? null
+
+  // Is the current page an intro or conclusion page?
+  const introductionPages = pages.filter((p) => !p.module_id && INTRO_TYPES.includes(p.page_type))
+  const conclusionPages = pages.filter((p) => !p.module_id && !INTRO_TYPES.includes(p.page_type))
+  const isViewingIntroPage = currentPageId ? introductionPages.some((p) => p.id === currentPageId) : false
+  const isViewingConclusionPage = currentPageId ? conclusionPages.some((p) => p.id === currentPageId) : false
+
+  // Start with all modules collapsed except the active one
+  const [collapsed, setCollapsed] = useState<Set<string>>(
+    () => new Set(modules.map((m) => m.id).filter((id) => id !== activeModuleId))
+  )
+
+  // Intro: open if viewing an intro page; collapsed otherwise
+  const [introCollapsed, setIntroCollapsed] = useState(!isViewingIntroPage)
+  // Conclusion: open only if viewing a conclusion page; collapsed otherwise
+  const [conclusionCollapsed, setConclusionCollapsed] = useState(!isViewingConclusionPage)
 
   const toggle = (id: string) => setCollapsed((prev) => {
     const next = new Set(prev)
@@ -157,13 +230,10 @@ function SidebarContent({
     return next
   })
 
-  const introductionPages = pages.filter((p) => !p.module_id && INTRO_TYPES.includes(p.page_type))
-  const conclusionPages = pages.filter((p) => !p.module_id && !INTRO_TYPES.includes(p.page_type))
   const unassignedLessons = lessons.filter((l) => !l.module_id)
 
   const byModule = modules.map((m) => ({
     module: m,
-    pages: pages.filter((p) => p.module_id === m.id),
     lessons: lessons.filter((l) => l.module_id === m.id),
   }))
 
@@ -179,16 +249,18 @@ function SidebarContent({
         }}>
           <span>←</span> <span>{courseTitle}</span>
         </Link>
-        <Link href={`/courses/${courseSlug}/contents`} style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', display: 'block', marginTop: 4 }}>
-          Table of Contents
-        </Link>
       </div>
 
       {/* Introduction pages (course-level, no module) */}
       {introductionPages.length > 0 && (
         <>
-          <SectionDivider label="Introduction" />
-          {introductionPages.map((p) => (
+          <SectionDivider
+            label="Introduction"
+            collapsible
+            collapsed={introCollapsed}
+            onToggle={() => setIntroCollapsed((v) => !v)}
+          />
+          {!introCollapsed && introductionPages.map((p) => (
             <div key={p.id} onClick={onNavClick}>
               <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
             </div>
@@ -197,8 +269,8 @@ function SidebarContent({
       )}
 
       {/* Module groups */}
-      {byModule.map(({ module, pages: modPages, lessons: modLessons }) => {
-        if (!modPages.length && !modLessons.length) return null
+      {byModule.map(({ module, lessons: modLessons }) => {
+        if (!modLessons.length) return null
         const isCollapsed = collapsed.has(module.id)
         const moduleStartIndex = globalIndex
         globalIndex += modLessons.length
@@ -212,21 +284,16 @@ function SidebarContent({
             />
             {!isCollapsed && (
               <>
-                {modPages.map((p) => (
-                  <div key={p.id} onClick={onNavClick}>
-                    <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
-                  </div>
-                ))}
                 {modLessons.map((lesson, i) => {
                   const active = isActiveLesson(lesson, currentLessonId, currentLessonSlug)
                   return (
                     <div key={lesson.id} onClick={onNavClick}>
-                      <SidebarLink href={lessonHref(courseSlug, lesson)} active={active} indent>
-                        <span style={{ fontSize: 10, color: 'var(--text-3)', marginRight: 6, flexShrink: 0 }}>
-                          Lesson {moduleStartIndex + i + 1}
-                        </span>
-                        {lesson.title}
-                      </SidebarLink>
+                      <LessonLink
+                        href={lessonHref(courseSlug, lesson, moduleSlugMap)}
+                        active={active}
+                        number={moduleStartIndex + i + 1}
+                        title={lesson.title}
+                      />
                     </div>
                   )
                 })}
@@ -239,8 +306,13 @@ function SidebarContent({
       {/* Conclusion pages (course-level, no module) */}
       {conclusionPages.length > 0 && (
         <>
-          <SectionDivider label="Conclusion" />
-          {conclusionPages.map((p) => (
+          <SectionDivider
+            label="Conclusion"
+            collapsible
+            collapsed={conclusionCollapsed}
+            onToggle={() => setConclusionCollapsed((v) => !v)}
+          />
+          {!conclusionCollapsed && conclusionPages.map((p) => (
             <div key={p.id} onClick={onNavClick}>
               <PageLink href={pageHref(courseSlug, p)} title={p.title} active={p.id === currentPageId} />
             </div>
@@ -252,15 +324,16 @@ function SidebarContent({
       {unassignedLessons.length > 0 && (
         <>
           <SectionDivider label="Lessons" />
-          {unassignedLessons.map((lesson) => {
-            globalIndex++
+          {unassignedLessons.map((lesson, i) => {
             const active = isActiveLesson(lesson, currentLessonId, currentLessonSlug)
             return (
               <div key={lesson.id} onClick={onNavClick}>
-                <SidebarLink href={lessonHref(courseSlug, lesson)} active={active}>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 6 }}>{globalIndex}</span>
-                  {lesson.title}
-                </SidebarLink>
+                <LessonLink
+                  href={lessonHref(courseSlug, lesson, moduleSlugMap)}
+                  active={active}
+                  number={i + 1}
+                  title={lesson.title}
+                />
               </div>
             )
           })}

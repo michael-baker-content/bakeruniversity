@@ -462,16 +462,16 @@ export default function QuizEditor({ courseId, lessonId }: QuizEditorProps) {
   if (loading) return <div style={{ padding: '1rem', color: '#888' }}>Loading quiz...</div>
 
   return (
-    <div style={{ marginTop: '2rem', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
+    <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Quiz</h2>
+        <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: '1.25rem' }}>Quiz</h2>
         {quiz && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             <label>Passing score:</label>
             <input
               type="number" min={0} max={100} value={passingScore}
               onChange={(e) => updatePassingScore(Number(e.target.value))}
-              style={{ width: 60, padding: '3px 6px', border: '1px solid #ddd', borderRadius: 4, fontSize: 13 }}
+              style={{ width: 60, padding: '3px 6px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, background: 'var(--surface)', color: 'var(--text)' }}
             />
             <span>%</span>
           </div>

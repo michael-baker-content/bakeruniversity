@@ -34,6 +34,8 @@ export interface Module {
   id: string
   course_id: string
   title: string
+  description: string | null
+  slug: string | null
   position: number
   created_at: string
   updated_at: string

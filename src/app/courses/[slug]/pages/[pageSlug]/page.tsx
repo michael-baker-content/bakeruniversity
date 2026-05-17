@@ -20,7 +20,7 @@ interface CoursePage {
   position: number
 }
 
-interface Module { id: string; title: string; position: number }
+interface Module { id: string; title: string; position: number; slug: string | null }
 
 export default async function CoursePageViewer({
   params,
@@ -62,7 +62,7 @@ export default async function CoursePageViewer({
     supabase.from('lessons').select('id, slug, title, position, module_id')
       .eq('course_id', course.id).eq('is_published', true).order('position', { ascending: true })
       .returns<Pick<Lesson, 'id' | 'slug' | 'title' | 'position' | 'module_id'>[]>(),
-    supabase.from('modules').select('id, title, position')
+    supabase.from('modules').select('id, title, position, slug')
       .eq('course_id', course.id).order('position', { ascending: true }).returns<Module[]>(),
   ])
 

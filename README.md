@@ -122,6 +122,8 @@ src/
 │   │   │   ├── page.tsx                    # Course editor — server component, fetches data
 │   │   │   ├── CourseDetailLayout.tsx      # Client component — collapsible module sections
 │   │   │   ├── PublishToggle.tsx           # Publish/unpublish toggle
+│   │   │   ├── modules/new/                # New module form
+│   │   │   └── modules/[moduleId]/         # Module editor
 │   │   │   ├── lessons/[lessonId]/         # Lesson editor
 │   │   │   ├── modules/[moduleId]/         # Module editor
 │   │   │   └── pages/[pageId]/             # Course page editor
@@ -138,7 +140,9 @@ src/
 │   │   └── [slug]/
 │   │       ├── page.tsx                    # Course detail + full contents list
 │   │       ├── contents/                   # Standalone table of contents
-│   │       ├── lessons/[lessonSlug]/       # Lesson viewer
+│   │       ├── [moduleSlug]/[lessonSlug]/  # Canonical lesson viewer
+│   │       ├── [moduleSlug]/               # Module landing — redirects to first lesson
+│   │       ├── lessons/[lessonSlug]/       # Legacy URL — redirects to canonical URL
 │   │       └── pages/[pageSlug]/           # Course page viewer
 │   ├── progress/                           # Student progress dashboard
 │   └── profile/                            # Clerk user profile
@@ -169,6 +173,7 @@ src/
 │   └── DeleteButton.tsx                    # Reusable inline delete with confirm
 └── lib/
     ├── supabase.ts                          # Browser, server, and service role clients
+    ├── lessonUrl.ts                         # Shared lesson URL helpers (module-aware hrefs)
     ├── types.ts                             # TypeScript types
     └── markdownToTipTap.ts                 # Markdown → TipTap JSON converter
 ```
@@ -182,7 +187,9 @@ src/
 | `/courses` | Course catalogue |
 | `/courses/[slug]` | Course detail and contents |
 | `/courses/[slug]/contents` | Table of contents |
-| `/courses/[slug]/lessons/[lessonSlug]` | Lesson viewer |
+| `/courses/[slug]/[moduleSlug]/[lessonSlug]` | Lesson viewer (canonical) |
+| `/courses/[slug]/[moduleSlug]` | Module landing — redirects to first lesson |
+| `/courses/[slug]/lessons/[lessonSlug]` | Legacy lesson URL — redirects to canonical |
 | `/courses/[slug]/pages/[pageSlug]` | Course page viewer |
 | `/progress` | Student progress across all enrolled courses |
 | `/admin/courses` | Instructor course list |

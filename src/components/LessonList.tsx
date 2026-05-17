@@ -3,10 +3,12 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { lessonHref, buildModuleSlugMap } from '@/lib/lessonUrl'
 
 interface Module {
   id: string
   title: string
+  slug?: string | null
 }
 
 interface Lesson {
@@ -56,6 +58,7 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
       <button
         ref={btnRef}
         onClick={handleOpen}
+        className="module-dropdown-btn"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -67,7 +70,6 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
           background: 'var(--surface)',
           cursor: 'pointer',
           color: 'var(--text-2)',
-          width: 140,
         }}
         title="Assign to module"
       >
@@ -114,15 +116,14 @@ function ModuleDropdown({ lessonId, currentModuleId, modules, onAssign }: {
                   textAlign: 'left',
                   padding: '8px 12px',
                   fontSize: 13,
-                  background: m.id === (currentModuleId ?? 'none') ? '#f0f0f0' : 'white',
+                  background: m.id === (currentModuleId ?? 'none') ? 'var(--surface-2)' : 'var(--surface)',
                   border: 'none',
+                  borderBottom: '1px solid var(--border)',
                   cursor: 'pointer',
                   whiteSpace: 'normal',
                   lineHeight: 1.4,
-                  borderBottom: '1px solid #f5f5f5',
+                  color: 'var(--text)',
                 }}
-                onMouseEnter={(e) => { if (m.id !== (currentModuleId ?? 'none')) e.currentTarget.style.background = '#fafafa' }}
-                onMouseLeave={(e) => { if (m.id !== (currentModuleId ?? 'none')) e.currentTarget.style.background = 'white' }}
               >
                 {m.title}
               </button>
@@ -143,6 +144,7 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
   const [lessons, setLessons] = useState<Lesson[]>(initialLessons)
   const [moving, setMoving] = useState<string | null>(null)
   const router = useRouter()
+  const moduleSlugMap = buildModuleSlugMap(modules)
 
   const move = async (lessonId: string, direction: 'up' | 'down') => {
     const index = lessons.findIndex((l) => l.id === lessonId)
@@ -185,9 +187,9 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
 
   if (!lessons.length) {
     return (
-      <div style={{ textAlign: 'center', padding: '3rem 0', color: '#666', border: '1px dashed #ddd', borderRadius: 8 }}>
-        <p>No lessons yet.</p>
-        <Link href={`/admin/courses/${courseSlug}/lessons/new`}>Add your first lesson →</Link>
+      <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
+        <p style={{ margin: '0 0 0.5rem' }}>No lessons yet.</p>
+        <Link href={`/admin/courses/${courseSlug}/lessons/new`} style={{ color: 'var(--indigo)', fontSize: 14 }}>Add your first lesson →</Link>
       </div>
     )
   }
@@ -202,69 +204,58 @@ export default function LessonList({ lessons: initialLessons, modules, courseId,
           opacity: moving === lesson.id ? 0.5 : 1,
           transition: 'opacity 0.15s',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              {/* Up/down arrows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
-                <button
-                  onClick={() => move(lesson.id, 'up')}
-                  disabled={index === 0 || !!moving}
-                  style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
-                  title="Move up"
-                >▲</button>
-                <button
-                  onClick={() => move(lesson.id, 'down')}
-                  disabled={index === lessons.length - 1 || !!moving}
-                  style={{ background: 'none', border: 'none', cursor: index === lessons.length - 1 ? 'default' : 'pointer', opacity: index === lessons.length - 1 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
-                  title="Move down"
-                >▼</button>
-              </div>
-
-              <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>{index + 1}</span>
-
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {lesson.title}
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2, flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: 11, padding: '1px 6px', borderRadius: 'var(--radius-full)',
-                    background: lesson.is_published ? '#dcfce7' : '#f3f4f6',
-                    color: lesson.is_published ? '#166534' : '#6b7280',
-                  }}>
-                    {lesson.is_published ? 'Published' : 'Draft'}
-                  </span>
-                  {lesson.module_id && modules.find(m => m.id === lesson.module_id) && (
-                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                      {modules.find(m => m.id === lesson.module_id)?.title}
-                    </span>
-                  )}
-                </div>
-              </div>
+          {/* Top row: arrows + number + title + published badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, marginBottom: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+              <button
+                onClick={() => move(lesson.id, 'up')}
+                disabled={index === 0 || !!moving}
+                style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
+                title="Move up"
+              >▲</button>
+              <button
+                onClick={() => move(lesson.id, 'down')}
+                disabled={index === lessons.length - 1 || !!moving}
+                style={{ background: 'none', border: 'none', cursor: index === lessons.length - 1 ? 'default' : 'pointer', opacity: index === lessons.length - 1 ? 0.2 : 0.6, fontSize: 10, padding: '1px 4px', lineHeight: 1 }}
+                title="Move down"
+              >▼</button>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* Module assignment */}
-              {modules.length > 0 && (
-                <ModuleDropdown
-                  lessonId={lesson.id}
-                  currentModuleId={lesson.module_id}
-                  modules={modules}
-                  onAssign={assignModule}
-                />
-              )}
+            <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{index + 1}</span>
 
-              <Link href={`/admin/courses/${courseSlug}/lessons/${lesson.slug ?? lesson.id}`}>
-                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', cursor: 'pointer' }}>
-                  Edit
+            <span style={{ fontWeight: 500, fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {lesson.title}
+            </span>
+
+            <span style={{
+              fontSize: 11, padding: '1px 6px', borderRadius: 'var(--radius-full)', flexShrink: 0,
+              background: lesson.is_published ? 'var(--success-bg)' : 'var(--surface-2)',
+              color: lesson.is_published ? 'var(--success)' : 'var(--text-3)',
+            }}>
+              {lesson.is_published ? 'Published' : 'Draft'}
+            </span>
+          </div>
+
+          {/* Bottom row: module dropdown + edit + preview — wraps naturally at narrow widths */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', alignItems: 'center', paddingLeft: 28 }}>
+            {modules.length > 0 && (
+              <ModuleDropdown
+                lessonId={lesson.id}
+                currentModuleId={lesson.module_id}
+                modules={modules}
+                onAssign={assignModule}
+              />
+            )}
+            <Link href={`/admin/courses/${courseSlug}/lessons/${lesson.slug ?? lesson.id}`}>
+              <button className="btn btn-ghost btn-sm">Edit</button>
+            </Link>
+            {lesson.slug && (
+              <Link href={lessonHref(courseSlug, lesson, moduleSlugMap)} target="_blank">
+                <button className="btn btn-ghost btn-sm">
+                  <span className="preview-btn-label">Preview </span>↗
                 </button>
               </Link>
-              <Link href={lesson.slug ? `/courses/${courseSlug}/lessons/${lesson.slug}` : `/courses/${courseSlug}/lessons/${lesson.id}`} target="_blank">
-                <button style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', cursor: 'pointer' }}>
-                  Preview ↗
-                </button>
-              </Link>
-            </div>
+            )}
           </div>
         </div>
       ))}

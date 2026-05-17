@@ -46,7 +46,7 @@ export async function POST(
   const ctx = await verifyInstructor(clerkUser.id, courseId)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { title } = await req.json()
+  const { title, description } = await req.json()
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
   // Get next position
@@ -57,7 +57,13 @@ export async function POST(
 
   const { data, error } = await ctx.supabase
     .from('modules')
-    .insert({ course_id: courseId, title: title.trim(), position: count ?? 0 })
+    .insert({
+      course_id: courseId,
+      title: title.trim(),
+      description: description ?? null,
+      position: count ?? 0,
+      slug: String((count ?? 0) + 1),
+    })
     .select('*')
     .single()
 

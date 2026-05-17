@@ -28,8 +28,6 @@ export default function EditCoursePage() {
 
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
-  const [modules, setModules] = useState<{ id: string; title: string }[]>([])
-  const [moduleId, setModuleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -47,17 +45,14 @@ export default function EditCoursePage() {
       .then(async (data) => {
         if (!data.id) return
         setCourseId(data.id)
-        const [pageRes, modsRes] = await Promise.all([
+        const [pageRes] = await Promise.all([
           fetch(`/api/admin/courses/${data.id}/pages/${pageId}`).then((r) => r.json()),
-          fetch(`/api/admin/courses/${data.id}/modules`).then((r) => r.json()),
         ])
         setTitle(pageRes.title ?? '')
         setPageType(pageRes.page_type ?? 'custom')
-        setModuleId(pageRes.module_id ?? null)
         setIntroduction(pageRes.introduction ?? '')
         setContent(pageRes.content ?? {})
         setIsPublished(pageRes.is_published ?? false)
-        setModules(Array.isArray(modsRes) ? modsRes : [])
         setReady(true)
       })
       .finally(() => setLoading(false))
@@ -78,7 +73,6 @@ export default function EditCoursePage() {
         introduction: introduction || null,
         content,
         is_published: isPublished,
-        module_id: moduleId ?? null,
       }),
     })
 
@@ -140,23 +134,6 @@ export default function EditCoursePage() {
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
           <input className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
-
-        {/* Module */}
-        {modules.length > 0 && (
-          <div>
-            <label style={labelStyle}>Module</label>
-            <select
-              className="input"
-              value={moduleId ?? ''}
-              onChange={(e) => setModuleId(e.target.value || null)}
-            >
-              <option value="">— No module —</option>
-              {modules.map((m) => (
-                <option key={m.id} value={m.id}>{m.title}</option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Introduction */}
         {INTRO_TYPES.includes(pageType) && (

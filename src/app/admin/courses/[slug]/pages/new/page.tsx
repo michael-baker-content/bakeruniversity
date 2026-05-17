@@ -15,7 +15,7 @@ const PAGE_TYPES = [
   { value: 'requirements',  label: 'Requirements',  hint: 'Prerequisites and technical requirements' },
   { value: 'resources',     label: 'Resources',     hint: 'Suggested reading, links, bibliography' },
   { value: 'conclusion',    label: 'Conclusion',    hint: 'Wrap up and next steps' },
-  { value: 'custom',        label: 'Custom',        hint: 'Any other content' },
+  { value: 'custom',        label: 'Custom',        hint: 'Any other course-level content' },
 ]
 
 const INTRO_TYPES = ['introduction', 'conclusion']
@@ -27,8 +27,6 @@ export default function NewCoursePage() {
 
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const [courseId, setCourseId] = useState<string | null>(null)
-  const [modules, setModules] = useState<{ id: string; title: string }[]>([])
-  const [moduleId, setModuleId] = useState<string | null>(null)
   const [resolving, setResolving] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -38,18 +36,9 @@ export default function NewCoursePage() {
   const [content, setContent] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
-    const preselectedModule = new URLSearchParams(window.location.search).get('module')
-
     fetch(`/api/admin/course-id-by-slug?slug=${encodeURIComponent(slug)}`)
       .then((r) => r.json())
-      .then(async (data) => {
-        if (!data.id) return
-        setCourseId(data.id)
-        const res = await fetch(`/api/admin/courses/${data.id}/modules`)
-        const mods = await res.json()
-        setModules(Array.isArray(mods) ? mods : [])
-        if (preselectedModule) setModuleId(preselectedModule)
-      })
+      .then((data) => { if (data.id) setCourseId(data.id) })
       .catch(() => setError('Could not load course'))
       .finally(() => setResolving(false))
   }, [slug])
@@ -64,10 +53,11 @@ export default function NewCoursePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title, page_type: pageType,
+        title,
+        page_type: pageType,
         introduction: introduction || null,
         content,
-        module_id: moduleId ?? null,
+        module_id: null,
       }),
     })
 
@@ -92,7 +82,10 @@ export default function NewCoursePage() {
         <span style={{ color: 'var(--text-2)' }}>New page</span>
       </div>
 
-      <h1 style={{ margin: '0 0 2rem' }}>New course page</h1>
+      <h1 style={{ margin: '0 0 0.5rem' }}>New course page</h1>
+      <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 2rem' }}>
+        Course pages appear in the Introduction or Conclusion sections — not inside modules.
+      </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
@@ -121,23 +114,6 @@ export default function NewCoursePage() {
           <label style={labelStyle}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
           <input className="input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
-
-        {/* Module */}
-        {modules.length > 0 && (
-          <div>
-            <label style={labelStyle}>Module</label>
-            <select
-              className="input"
-              value={moduleId ?? ''}
-              onChange={(e) => setModuleId(e.target.value || null)}
-            >
-              <option value="">— No module —</option>
-              {modules.map((m) => (
-                <option key={m.id} value={m.id}>{m.title}</option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Introduction */}
         {INTRO_TYPES.includes(pageType) && (

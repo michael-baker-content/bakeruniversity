@@ -44,6 +44,8 @@ create table courses (
   currency      text not null default 'usd',
   is_published  boolean not null default false,
   thumbnail_url text,
+  intro_description text,
+  conclusion_description text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -56,6 +58,7 @@ create table modules (
   course_id   uuid not null references courses(id) on delete cascade,
   title       text not null,
   description text,
+  slug        text,
   position    integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -242,6 +245,7 @@ create table response_feedback (
 create index on courses (instructor_id);
 create index on courses (slug);
 create index on modules (course_id, position);
+create unique index on modules (course_id, slug);
 create index on lessons (course_id, position);
 create index on lessons (module_id);
 create index on lessons (course_id, slug);
