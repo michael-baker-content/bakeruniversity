@@ -211,7 +211,7 @@ export default function EditLessonPage() {
           {ready && (
             <TipTapEditor
               key="lesson-editor"
-              packs={(['code', ...editorTools] as import('@/components/TipTapEditor').EditorPack[])}
+              packs={(editorTools as import('@/components/TipTapEditor').EditorPack[])}
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
               onEditorReady={(fn) => { insertFnRef.current = fn }}

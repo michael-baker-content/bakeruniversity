@@ -15,11 +15,12 @@ interface Props {
 }
 
 const TOOL_OPTIONS = [
-  { value: 'math', label: 'LaTeX math formulas', description: 'Inline and block math rendering via KaTeX' },
-  { value: 'graph', label: 'Interactive graphs', description: 'Mafs graph editor for plotting functions' },
-  { value: 'python-lint', label: 'Python linting', description: 'Heuristic lint checks on Python code blocks' },
-  { value: 'terminal', label: 'Terminal blocks', description: 'Styled terminal/bash output blocks' },
-  { value: 'lang-select', label: 'Language selector', description: 'Per-block language dropdown on code blocks' },
+  { value: 'math',        label: 'LaTeX math formulas', description: 'Inline and block math rendering via KaTeX',                   requires: null },
+  { value: 'graph',       label: 'Interactive graphs',  description: 'Mafs graph editor for plotting functions',                     requires: null },
+  { value: 'terminal',    label: 'Terminal blocks',      description: 'Styled terminal/bash output blocks',                           requires: null },
+  { value: 'code',        label: 'Code blocks',          description: 'Syntax-highlighted code blocks with line numbers and filename', requires: null },
+  { value: 'python-lint', label: 'Python linting',       description: 'Heuristic lint checks on Python code blocks',                  requires: 'code' },
+  { value: 'lang-select', label: 'Language selector',    description: 'Per-block language dropdown on code blocks',                   requires: 'code' },
 ]
 
 export default function CourseSettings({ courseId, title, description, slug, priceCents, thumbnailUrl, introDescription, conclusionDescription, editorTools }: Props) {
@@ -166,25 +167,33 @@ export default function CourseSettings({ courseId, title, description, slug, pri
                 <span style={labelStyle}>Lesson editor tools</span>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 8px' }}>Choose which extended tools are available in the lesson editor for this course.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {TOOL_OPTIONS.map((tool) => (
-                    <label key={tool.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={form.editorTools.includes(tool.value)}
-                        onChange={(e) => {
-                          const next = e.target.checked
-                            ? [...form.editorTools, tool.value]
-                            : form.editorTools.filter((t) => t !== tool.value)
-                          set('editorTools', next)
-                        }}
-                        style={{ marginTop: 2, flexShrink: 0 }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{tool.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{tool.description}</div>
-                      </div>
-                    </label>
-                  ))}
+                  {TOOL_OPTIONS.map((tool) => {
+                    const disabled = tool.requires !== null && !form.editorTools.includes(tool.requires)
+                    return (
+                      <label key={tool.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, paddingLeft: tool.requires ? 16 : 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={form.editorTools.includes(tool.value)}
+                          disabled={disabled}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...form.editorTools, tool.value]
+                              : form.editorTools.filter((t) => t !== tool.value)
+                            // If unchecking 'code', also remove dependent tools
+                            const cleaned = tool.value === 'code' && !e.target.checked
+                              ? next.filter((t) => TOOL_OPTIONS.find((o) => o.value === t)?.requires !== 'code')
+                              : next
+                            set('editorTools', cleaned)
+                          }}
+                          style={{ marginTop: 2, flexShrink: 0 }}
+                        />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{tool.label}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{tool.description}</div>
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
 

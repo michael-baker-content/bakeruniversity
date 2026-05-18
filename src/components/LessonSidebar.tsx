@@ -30,6 +30,7 @@ interface SidebarModule {
 interface LessonSidebarProps {
   courseSlug: string
   courseTitle: string
+  courseHomeUrl?: string  // overrides the back link — use admin URL for draft courses
   lessons: SidebarLesson[]
   modules: SidebarModule[]
   pages: CoursePage[]
@@ -197,10 +198,11 @@ function SectionDivider({ label, collapsible, collapsed, onToggle }: {
 const INTRO_TYPES = ['overview', 'introduction', 'syllabus', 'requirements']
 
 function SidebarContent({
-  courseSlug, courseTitle, lessons, modules, pages,
+  courseSlug, courseTitle, courseHomeUrl, lessons, modules, pages,
   currentLessonId, currentLessonSlug, currentPageId, onNavClick,
 }: LessonSidebarProps & { onNavClick?: () => void }) {
   const moduleSlugMap = buildModuleSlugMap(modules)
+  const backHref = courseHomeUrl ?? `/courses/${courseSlug}`
 
   // Find which module the current lesson belongs to
   const currentLesson = lessons.find((l) =>
@@ -243,7 +245,7 @@ function SidebarContent({
     <div style={{ paddingBottom: '2rem' }}>
       {/* Back link */}
       <div style={{ padding: '0 1rem 0.875rem', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
-        <Link href={`/courses/${courseSlug}`} style={{
+        <Link href={backHref} style={{
           fontSize: 12, color: 'var(--text-3)', textDecoration: 'none',
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
@@ -378,7 +380,7 @@ export default function LessonSidebar(props: LessonSidebarProps) {
           borderBottom: '1px solid var(--border)',
           position: 'sticky', top: 52, zIndex: 40,
         }}>
-          <Link href={`/courses/${props.courseSlug}`} style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Back</Link>
+          <Link href={props.courseHomeUrl ?? `/courses/${props.courseSlug}`} style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Back</Link>
           <button
             onClick={() => setMobileOpen((o) => !o)}
             style={{

@@ -11,6 +11,20 @@
   --surface:      #FFFFFF;
   --surface-2:    #F3F0EB;
 
+  /* Code block */
+  --code-bg:        #f6f8fa;
+  --code-text:      #24292f;
+  --code-border:    #d0d7de;
+  --code-line-num:  #8c959f;
+  --code-header-bg: #f0f2f4;
+  --code-filename:  #24292f;
+  --code-lang:      #57606a;
+  --code-line-hover: rgba(0,0,0,0.04);
+
+  /* Mafs graph */
+  --mafs-bg:        #ffffff;
+  --mafs-fg:        #1a1a1a;
+
   /* Borders */
   --border:       #E8E4DC;
   --border-strong: #D0CAC0;
@@ -56,6 +70,20 @@
   --bg:           #18170F;
   --surface:      #222218;
   --surface-2:    #2A2920;
+
+  /* Code block */
+  --code-bg:        #0d1117;
+  --code-text:      #e6edf3;
+  --code-border:    #30363d;
+  --code-line-num:  #636e7b;
+  --code-header-bg: #161b22;
+  --code-filename:  #cdd9e5;
+  --code-lang:      #768390;
+  --code-line-hover: rgba(255,255,255,0.04);
+
+  /* Mafs graph */
+  --mafs-bg:        #1a1a2e;
+  --mafs-fg:        #e6edf3;
 
   --border:       #2E2D22;
   --border-strong: #3D3C2E;
@@ -353,14 +381,15 @@ textarea.input { resize: vertical; min-height: 80px; }
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 .tiptap pre {
-  background: #1A1814;
-  color: #F5F0E8;
-  padding: 1rem 1.25rem;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--code-border);
+  padding: 0;
   border-radius: var(--radius);
   overflow-x: auto;
   margin: 0 0 0.875rem;
-  font-size: 13.5px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .tiptap code {
   background: var(--surface-2);
@@ -369,7 +398,7 @@ textarea.input { resize: vertical; min-height: 80px; }
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
-.tiptap pre code { background: none; color: inherit; padding: 0; }
+.tiptap pre code { background: none; padding: 0; }
 .tiptap img {
   max-width: 100%;
   height: auto;
@@ -421,13 +450,14 @@ textarea.input { resize: vertical; min-height: 80px; }
   margin: 1rem 0;
 }
 .lesson-content pre {
-  background: #1A1814;
-  color: #F5F0E8;
-  padding: 1rem 1.25rem;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0;
   border-radius: var(--radius);
   overflow-x: auto;
   margin: 1rem 0;
-  font-size: 13.5px;
+  font-size: 13px;
+  border: 1px solid var(--code-border);
 }
 .lesson-content code {
   background: var(--surface-2);
@@ -436,7 +466,8 @@ textarea.input { resize: vertical; min-height: 80px; }
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
-.lesson-content pre code { background: none; color: inherit; padding: 0; }
+pre[data-terminal-pre] { color: #e6edf3 !important; background: none !important; border: none !important; }
+.lesson-content pre code { background: none; padding: 0; }
 .lesson-content hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 .lesson-content a { color: var(--indigo); text-decoration: underline; text-decoration-color: var(--indigo-muted); }
 .lesson-content a:hover { text-decoration-color: var(--indigo); }
@@ -448,6 +479,103 @@ textarea.input { resize: vertical; min-height: 80px; }
 @media (max-width: 468px) {
   .meta-wrap { display: block; }
 }
+
+/* ── Code block syntax highlighting ────────────────────────────────────────── */
+/* highlight.js GitHub Dark theme loaded via <link> in layout.tsx */
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 1rem 4px;
+  border-bottom: 1px solid var(--code-border);
+  margin-bottom: 4px;
+  background: var(--code-header-bg);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.code-filename {
+  font-size: 12px;
+  color: var(--code-filename);
+  font-family: monospace;
+  font-weight: 600;
+}
+.code-lang-label {
+  font-size: 10px;
+  color: var(--code-lang);
+  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Line-numbered code blocks */
+code.with-line-numbers {
+  display: block;
+  padding: 0.5rem 0;
+  line-height: 1.5;
+}
+.code-line {
+  display: table-row;
+}
+.code-line-num {
+  display: table-cell;
+  color: var(--code-line-num);
+  text-align: right;
+  padding: 0 1rem 0 1rem;
+  user-select: none;
+  font-size: 12px;
+  min-width: 2rem;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.code-line-content {
+  display: table-cell;
+  padding-right: 1rem;
+  white-space: pre;
+  vertical-align: top;
+}
+.code-line:hover .code-line-num,
+.code-line:hover .code-line-content { background: var(--code-line-hover); }
+
+/* ── Light mode highlight.js token overrides ────────────────────────────────
+   github-dark.min.css is always loaded; these override tokens for light mode  */
+[data-theme="light"] .hljs { color: #24292f; }
+[data-theme="light"] .hljs-doctag,
+[data-theme="light"] .hljs-keyword,
+[data-theme="light"] .hljs-meta .hljs-keyword,
+[data-theme="light"] .hljs-template-tag,
+[data-theme="light"] .hljs-template-variable,
+[data-theme="light"] .hljs-type,
+[data-theme="light"] .hljs-variable.language_ { color: #cf222e; }
+[data-theme="light"] .hljs-title,
+[data-theme="light"] .hljs-title.class_,
+[data-theme="light"] .hljs-title.class_.inherited__,
+[data-theme="light"] .hljs-title.function_ { color: #8250df; }
+[data-theme="light"] .hljs-attr,
+[data-theme="light"] .hljs-attribute,
+[data-theme="light"] .hljs-literal,
+[data-theme="light"] .hljs-meta,
+[data-theme="light"] .hljs-number,
+[data-theme="light"] .hljs-operator,
+[data-theme="light"] .hljs-selector-attr,
+[data-theme="light"] .hljs-selector-class,
+[data-theme="light"] .hljs-selector-id,
+[data-theme="light"] .hljs-variable { color: #953800; }
+[data-theme="light"] .hljs-punctuation,
+[data-theme="light"] .hljs-tag { color: #116329; }
+[data-theme="light"] .hljs-string,
+[data-theme="light"] .hljs-regexp { color: #0a3069; }
+[data-theme="light"] .hljs-built_in,
+[data-theme="light"] .hljs-symbol { color: #8250df; }
+[data-theme="light"] .hljs-comment,
+[data-theme="light"] .hljs-code,
+[data-theme="light"] .hljs-formula { color: #6e7781; font-style: italic; }
+[data-theme="light"] .hljs-name,
+[data-theme="light"] .hljs-quote,
+[data-theme="light"] .hljs-selector-tag { color: #116329; }
+[data-theme="light"] .hljs-deletion { color: #82071e; background: #ffebe9; }
+[data-theme="light"] .hljs-addition { color: #116329; background: #dafbe1; }
+[data-theme="light"] .hljs-emphasis { font-style: italic; }
+[data-theme="light"] .hljs-strong { font-weight: bold; }
 
 /* ── Admin responsive helpers ──────────────────────────────────────────────── */
 

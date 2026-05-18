@@ -33,6 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${dmSans.variable} ${dmSerifDisplay.variable}`}
         suppressHydrationWarning
       >
+        <head>
+          {/* Load both hljs themes; globals.css overrides hljs vars per data-theme */}
+          <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.0/styles/github-dark.min.css"
+          />
+        </head>
         <body>
           <ThemeProvider>
             {children}

@@ -115,6 +115,7 @@ export default async function CoursePageViewer({
         <LessonSidebar
           courseSlug={slug}
           courseTitle={course.title}
+          courseHomeUrl={isInstructor && !course.is_published ? `/admin/courses/${slug}` : undefined}
           lessons={allLessons}
           modules={modules}
           pages={allPages}

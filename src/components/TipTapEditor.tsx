@@ -7,11 +7,9 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Image from '@tiptap/extension-image'
 import { all, createLowlight } from 'lowlight'
 import katex from 'katex'
-import dynamic from 'next/dynamic'
-import 'katex/dist/katex.min.css'
+import MafsGraph from '@/components/MafsGraph'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
-
-const MafsGraph = dynamic(() => import('@/components/MafsGraph'), { ssr: false })
+import 'katex/dist/katex.min.css'
 
 const lowlight = createLowlight(all)
 
@@ -135,6 +133,7 @@ function TerminalNodeView({ node, selected }: { node: { attrs: { prompt: string;
     <NodeViewWrapper>
       <div style={{
         background: '#0d1117',
+        color: '#e6edf3',
         borderRadius: 8,
         padding: '12px 16px',
         margin: '0.75rem 0',
@@ -142,7 +141,7 @@ function TerminalNodeView({ node, selected }: { node: { attrs: { prompt: string;
         fontSize: 13,
         lineHeight: 1.6,
         outline: selected ? '3px solid var(--amber)' : 'none',
-        border: '1px solid #30363d',
+        border: '1px solid var(--code-border)',
         overflowX: 'auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, opacity: 0.6 }}>
@@ -150,7 +149,7 @@ function TerminalNodeView({ node, selected }: { node: { attrs: { prompt: string;
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e', display: 'inline-block' }} />
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f', display: 'inline-block' }} />
         </div>
-        <pre style={{ margin: 0, color: '#e6edf3', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{node.attrs.content}</pre>
+        <pre data-terminal-pre style={{ margin: 0, color: '#e6edf3', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'none', border: 'none', padding: 0 }}>{node.attrs.content}</pre>
       </div>
     </NodeViewWrapper>
   )
@@ -194,7 +193,11 @@ const LANGUAGES = [
   { value: 'plaintext', label: 'Plain text' },
 ]
 
-// ── Python heuristic linter extension ────────────────────────────────────────
+const LANG_EXTENSIONS: Record<string, string> = {
+  python: 'py', javascript: 'js', typescript: 'ts', html: 'html',
+  css: 'css', bash: 'sh', sql: 'sql', json: 'json', java: 'java',
+  c: 'c', cpp: 'cpp', rust: 'rs', go: 'go', plaintext: 'txt',
+}
 function lintPython(code: string): { line: number; message: string; severity: 'error' | 'warning' }[] {
   const issues: { line: number; message: string; severity: 'error' | 'warning' }[] = []
   const lines = code.split('\n')
@@ -268,7 +271,93 @@ const PythonLintExtension = Extension.create({
   },
 })
 
-// ── Pack definitions ──────────────────────────────────────────────────────────
+// ── Callout block node ────────────────────────────────────────────────────────
+const CALLOUT_TYPES = [
+  { value: 'tip',      label: 'Tip',             icon: '💡', color: 'var(--success)',  bg: 'var(--success-bg)' },
+  { value: 'info',     label: 'Did you know?',   icon: 'ℹ️', color: 'var(--indigo)',   bg: 'var(--indigo-muted)' },
+  { value: 'warning',  label: 'Warning',         icon: '⚠️', color: 'var(--amber)',    bg: 'var(--amber-muted)' },
+  { value: 'note',     label: 'Note',            icon: '📝', color: 'var(--text-2)',   bg: 'var(--surface-2)' },
+  { value: 'reading',  label: 'Further reading', icon: '📚', color: 'var(--indigo)',   bg: 'var(--indigo-muted)' },
+  { value: 'alert',    label: 'Alert',           icon: '🚨', color: 'var(--danger)',   bg: 'var(--danger-bg, #fee2e2)' },
+]
+
+function CalloutNodeView({ node, updateAttributes, selected }: {
+  node: { attrs: { type: string; content: string } }
+  updateAttributes: (a: Record<string, unknown>) => void
+  selected: boolean
+}) {
+  const t = CALLOUT_TYPES.find((c) => c.value === node.attrs.type) ?? CALLOUT_TYPES[0]
+  const editRef = React.useRef<HTMLDivElement>(null)
+  const isUserEditing = React.useRef(false)
+
+  // Set innerHTML only when attrs change externally (e.g. load), not during user typing
+  React.useEffect(() => {
+    if (!editRef.current || isUserEditing.current) return
+    if (editRef.current.innerHTML !== node.attrs.content) {
+      editRef.current.innerHTML = node.attrs.content ?? ''
+    }
+  }, [node.attrs.content])
+
+  return (
+    <NodeViewWrapper>
+      <div style={{
+        borderLeft: `4px solid ${t.color}`,
+        background: t.bg,
+        borderRadius: '0 var(--radius) var(--radius) 0',
+        padding: '0.875rem 1rem',
+        margin: '1rem 0',
+        outline: selected ? `2px solid ${t.color}` : 'none',
+        outlineOffset: 2,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <span style={{ fontSize: 14 }}>{t.icon}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: t.color }}>{t.label}</span>
+          <select
+            value={node.attrs.type}
+            onChange={(e) => updateAttributes({ type: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 4px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', color: 'var(--text-3)', cursor: 'pointer' }}
+          >
+            {CALLOUT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        <div
+          ref={editRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', outline: 'none', minHeight: '1.5em', cursor: 'text' }}
+          onFocus={() => { isUserEditing.current = true }}
+          onBlur={() => {
+            isUserEditing.current = false
+            updateAttributes({ content: editRef.current?.innerHTML ?? '' })
+          }}
+          onKeyDown={(e) => { e.stopPropagation() }}
+          onMouseDown={(e) => { e.stopPropagation() }}
+        />
+      </div>
+    </NodeViewWrapper>
+  )
+}
+
+const CalloutNode = Node.create({
+  name: 'callout',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      type: { default: 'tip' },
+      content: { default: '' },
+    }
+  },
+  parseHTML() { return [{ tag: 'div[data-callout]' }] },
+  renderHTML({ node, HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-callout': node.attrs.type, 'data-content': node.attrs.content })]
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(CalloutNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
+  },
+})
 export type EditorPack = 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -309,12 +398,26 @@ export default function TipTapEditor({
   const [lintDiagnostics, setLintDiagnostics] = useState<{ line: number; message: string; severity: 'error' | 'warning' }[]>([])
   const [showTerminalModal, setShowTerminalModal] = useState(false)
   const [terminalContent, setTerminalContent] = useState('$ ')
+  const [filenameInput, setFilenameInput] = useState('')
+  const [showCalloutPicker, setShowCalloutPicker] = useState(false)
 
   // ── Build extensions list based on packs ──────────────────────────────────
   const extensions = [
     StarterKit.configure({ codeBlock: false }),
     Image.configure({ inline: false, allowBase64: false }),
-    ...(hasCode ? [CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'python' })] : []),
+    CalloutNode,
+    ...(hasCode ? [CodeBlockLowlight.configure({
+      lowlight,
+      defaultLanguage: 'python',
+    }).extend({
+      addAttributes() {
+        return {
+          ...this.parent?.(),
+          startLine: { default: 1 },
+          filename: { default: '' },
+        }
+      },
+    })] : []),
     ...(hasMath ? [InlineMath, BlockMath, MathShortcut] : []),
     ...(hasGraph ? [MafsGraphNode] : []),
     ...(hasTerminal ? [TerminalNode] : []),
@@ -404,6 +507,20 @@ export default function TipTapEditor({
     setShowTerminalModal(false)
   }, [editor])
 
+  // Sync filename input from active code block
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      if (editor.isActive('codeBlock')) {
+        const attrs = editor.getAttributes('codeBlock')
+        setFilenameInput(attrs.filename ?? '')
+      }
+    }
+    editor.on('selectionUpdate', update)
+    editor.on('update', update)
+    return () => { editor.off('selectionUpdate', update); editor.off('update', update) }
+  }, [editor])
+
   // Sync lint diagnostics from extension storage
   useEffect(() => {
     if (!editor || !hasPythonLint) return
@@ -432,29 +549,45 @@ export default function TipTapEditor({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
           <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>B</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>I</ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Inline code">&lt;/&gt;</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })}>H3</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>• List</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. List</ToolbarButton>
-          {hasCode && (
-            <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
-          )}
-          {hasTerminal && (
-            <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>⬛ Terminal</ToolbarButton>
-          )}
-          {hasLangSelect && editor.isActive('codeBlock') && (
-            <select
-              value={editor.getAttributes('codeBlock').language ?? 'python'}
-              onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run()}
-              style={{
-                padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer',
-              }}
-            >
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-          )}
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>" Quote</ToolbarButton>
+          {/* Callout picker */}
+          <div style={{ position: 'relative' }}>
+            <ToolbarButton onClick={() => setShowCalloutPicker((v) => !v)} active={showCalloutPicker} title="Insert callout block">
+              ✦ Callout
+            </ToolbarButton>
+            {showCalloutPicker && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, zIndex: 50,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)',
+                minWidth: 170, marginTop: 4, overflow: 'hidden',
+              }}>
+                {CALLOUT_TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => {
+                      editor.chain().focus().insertContent({ type: 'callout', attrs: { type: t.value, content: '' } }).run()
+                      setShowCalloutPicker(false)
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                      padding: '7px 12px', border: 'none', background: 'none',
+                      cursor: 'pointer', fontSize: 13, color: 'var(--text)',
+                      textAlign: 'left', borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    <span>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <ToolbarButton onClick={() => fileInputRef.current?.click()} active={false}>
             {uploading ? 'Uploading...' : '🖼 Image'}
           </ToolbarButton>
@@ -479,6 +612,69 @@ export default function TipTapEditor({
               </span>
             </>
           )}
+          {hasTerminal && (
+            <ToolbarButton onClick={() => setShowTerminalModal(true)} active={false}>⬛ Terminal</ToolbarButton>
+          )}
+          {/* Code group — wraps as one unit */}
+          {(hasCode || hasPythonLint || hasLangSelect) && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
+              {(hasCode || hasTerminal || hasPythonLint || hasLangSelect) && (
+                <span style={{ width: 1, background: 'var(--border)', margin: '0 4px', alignSelf: 'stretch' }} />
+              )}
+              {hasCode && (
+                <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}>Code</ToolbarButton>
+              )}
+              {hasLangSelect && editor.isActive('codeBlock') && (
+                <select
+                  value={editor.getAttributes('codeBlock').language ?? 'python'}
+                  onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run()}
+                  style={{ padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer' }}
+                >
+                  {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </select>
+              )}
+              {hasCode && editor.isActive('codeBlock') && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-3)' }}>
+                    Line:
+                    <input
+                      type="number"
+                      min={1}
+                      value={editor.getAttributes('codeBlock').startLine ?? 1}
+                      onChange={(e) => editor.chain().focus().updateAttributes('codeBlock', { startLine: parseInt(e.target.value) || 1 }).run()}
+                      style={{ width: 44, padding: '3px 6px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text)' }}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    name="code-filename"
+                    placeholder={`name.${LANG_EXTENSIONS[editor.getAttributes('codeBlock').language ?? 'python'] ?? 'py'}`}
+                    value={filenameInput}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-form-type="other"
+                    data-1p-ignore="true"
+                    onChange={(e) => setFilenameInput(e.target.value)}
+                    onBlur={(e) => {
+                      let name = e.target.value.trim()
+                      if (name && !name.includes('.')) {
+                        const lang = editor.getAttributes('codeBlock').language ?? 'python'
+                        const ext = LANG_EXTENSIONS[lang] ?? 'txt'
+                        name = `${name}.${ext}`
+                        setFilenameInput(name)
+                      }
+                      editor.chain().updateAttributes('codeBlock', { filename: name }).run()
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                    style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text)', width: 110 }}
+                  />
+                </>
+              )}
+            </span>
+          )}
         </div>
       )}
       <div
@@ -498,7 +694,6 @@ export default function TipTapEditor({
         .tiptap p { margin: 0 0 0.75rem; }
         .tiptap ul, .tiptap ol { padding-left: 1.5rem; margin: 0 0 0.75rem; }
         .tiptap blockquote { border-left: 3px solid var(--border); margin: 0 0 0.75rem; padding-left: 1rem; color: var(--text-2); }
-        .tiptap pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0 0 0.75rem; font-size: 13px; }
         .tiptap code { background: var(--surface-2); padding: 2px 5px; border-radius: 3px; font-size: 13px; }
         .tiptap pre code { background: none; padding: 0; }
         .tiptap [data-block-math] { text-align: center; margin: 1rem 0; cursor: pointer; padding: 4px 8px; border-radius: 4px; border: 2px solid transparent; }
@@ -510,6 +705,7 @@ export default function TipTapEditor({
         .tiptap img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5rem 0; display: block; }
         .tiptap img.ProseMirror-selectednode { outline: 3px solid var(--amber); }
         .tiptap [data-terminal] { font-family: monospace; }
+        .tiptap pre[data-terminal-pre] { color: #e6edf3 !important; background: none !important; border: none !important; padding: 0 !important; }
         .tiptap .ProseMirror-selectednode [data-terminal-inner] { outline: 3px solid var(--amber); }
       `}</style>
       {/* Terminal insert modal */}

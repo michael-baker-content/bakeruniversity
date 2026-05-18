@@ -4,9 +4,9 @@ import { Mafs, Coordinates, Plot, Text, Theme } from 'mafs'
 import 'mafs/core.css'
 
 export interface GraphFunction {
-  expression: string  // JS expression string, e.g. "Math.sin(x)"
+  expression: string
   color: string
-  label?: string      // optional label shown on graph
+  label?: string
 }
 
 export interface MafsGraphAttrs {
@@ -15,13 +15,12 @@ export interface MafsGraphAttrs {
   xMax: number
   yMin: number
   yMax: number
-  xStep?: number   // grid/label interval on x axis; auto-computed if omitted
-  yStep?: number   // grid/label interval on y axis; auto-computed if omitted
+  xStep?: number
+  yStep?: number
   showGrid: boolean
   label?: string
 }
 
-// Pick a round step size that gives roughly 5-10 labels across the range
 function autoStep(min: number, max: number): number {
   const range = Math.abs(max - min)
   const candidates = [0.25, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500]
@@ -31,7 +30,6 @@ function autoStep(min: number, max: number): number {
   return Math.ceil(range / 10)
 }
 
-// Safe function evaluator — returns a number or NaN
 function makeFunction(expression: string): (x: number) => number {
   try {
     // eslint-disable-next-line no-new-func
@@ -94,23 +92,14 @@ export default function MafsGraph({ attrs, height = 300 }: Props) {
           <Coordinates.Cartesian
             xAxis={{ lines: resolvedXStep }}
             yAxis={{ lines: resolvedYStep }}
+            subdivisions={false}
           />
         )}
 
-        {functions.map((fn, i) => {
-          const f = makeFunction(fn.expression)
-          const color = resolveColor(fn.color)
-          return (
-            <Plot.OfX
-              key={i}
-              y={f}
-              color={color}
-              weight={2.5}
-            />
-          )
-        })}
+        {functions.map((fn, i) => (
+          <Plot.OfX key={i} y={makeFunction(fn.expression)} color={resolveColor(fn.color)} weight={2.5} />
+        ))}
 
-        {/* Function labels at right edge */}
         {functions.map((fn, i) => {
           if (!fn.label) return null
           const f = makeFunction(fn.expression)
@@ -118,13 +107,7 @@ export default function MafsGraph({ attrs, height = 300 }: Props) {
           const labelY = f(labelX)
           if (isNaN(labelY) || labelY < yMin || labelY > yMax) return null
           return (
-            <Text
-              key={`label-${i}`}
-              x={labelX}
-              y={labelY}
-              attach="e"
-              color={resolveColor(fn.color)}
-            >
+            <Text key={`label-${i}`} x={labelX} y={labelY} attach="e">
               {fn.label}
             </Text>
           )
@@ -132,13 +115,7 @@ export default function MafsGraph({ attrs, height = 300 }: Props) {
       </Mafs>
 
       {label && (
-        <div style={{
-          textAlign: 'center',
-          fontSize: 13,
-          color: 'var(--text-2)',
-          padding: '6px 0 2px',
-          fontStyle: 'italic',
-        }}>
+        <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-2)', padding: '6px 0 2px', fontStyle: 'italic' }}>
           {label}
         </div>
       )}
@@ -146,4 +123,3 @@ export default function MafsGraph({ attrs, height = 300 }: Props) {
   )
 }
 
-export { makeFunction, GRAPH_COLORS }

@@ -133,6 +133,7 @@ export default async function LessonViewerPage({
           <LessonSidebar
             courseSlug={slug}
             courseTitle={course.title}
+            courseHomeUrl={isInstructor && !course.is_published ? `/admin/courses/${slug}` : undefined}
             lessons={allLessons}
             modules={modules}
             pages={coursePages}

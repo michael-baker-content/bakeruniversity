@@ -1,6 +1,6 @@
 # Bakerversity
 
-A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion.
+A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion. The lesson editor supports per-course configurable tool packs: LaTeX math, Mafs interactive graphs, syntax-highlighted code blocks with line numbers and filename labels, terminal/bash blocks, Python linting, language selector, and callout blocks (tip, info, warning, note, further reading, alert).
 
 ---
 
@@ -8,7 +8,7 @@ A custom online course platform built with Next.js, Clerk, Supabase, and Stripe.
 
 | Layer | Technology |
 |---|---|
-| Frontend / API | Next.js 16 (App Router, TypeScript) |
+| Frontend / API | Next.js 15 (App Router, TypeScript) |
 | Auth | Clerk |
 | Database | Supabase (Postgres) |
 | Storage | Supabase Storage |
@@ -76,7 +76,7 @@ For local development, use [ngrok](https://ngrok.com) to expose localhost and us
    - Uncheck **Automatically expose new tables** at project creation
    - Enable **Automatic RLS**
 2. Run `supabase/schema.sql` in the SQL Editor (Dashboard → SQL Editor)
-   Key columns added over time: `modules.slug`, `courses.thumbnail_url`, `courses.intro_description`, `courses.conclusion_description`, `courses.editor_tools`
+   Key columns added over time: `modules.slug`, `courses.thumbnail_url`, `courses.intro_description`, `courses.conclusion_description`, `courses.editor_tools` (text[] — stores selected editor tool packs per course)
 3. Copy keys from **Settings → API** into `.env.local`
 4. Create two storage buckets:
 
@@ -140,7 +140,6 @@ src/
 │   ├── courses/
 │   │   └── [slug]/
 │   │       ├── page.tsx                    # Course detail + full contents list
-│   │       ├── contents/                   # Standalone table of contents
 │   │       ├── [moduleSlug]/[lessonSlug]/  # Canonical lesson viewer
 │   │       ├── [moduleSlug]/               # Module landing — redirects to first lesson
 │   │       ├── lessons/[lessonSlug]/       # Legacy URL — redirects to canonical URL
@@ -152,24 +151,23 @@ src/
 │   ├── SiteNavClient.tsx                   # Interactive nav — hamburger, theme toggle
 │   ├── ThemeProvider.tsx                   # next-themes wrapper
 │   ├── ThemeToggle.tsx                     # Light/dark mode toggle
-│   ├── TipTapEditor.tsx                    # Rich text editor — configurable packs (math, code)
-│   ├── LessonRenderer.tsx                  # Read-only lesson content renderer
+│   ├── TipTapEditor.tsx                    # Rich text editor — per-course packs: math, graph, code, terminal, python-lint, lang-select; callout blocks always available
+│   ├── LessonRenderer.tsx                  # Read-only renderer — handles code blocks (with syntax highlighting, line numbers, filename), terminal blocks, callouts, graphs, LaTeX
 │   ├── LessonSidebar.tsx                   # Responsive sidebar — modules, pages, lessons
 │   ├── LessonList.tsx                      # Reorderable lesson list with module assignment
 │   ├── ContentRow.tsx                      # Course contents row (client, handles hover)
 │   ├── QuizEditor.tsx                      # Instructor quiz builder
 │   ├── QuizTaker.tsx                       # Student quiz UI
-│   ├── LatexModal.tsx                      # LaTeX formula reference
 │   ├── MarkdownImport.tsx                  # Import .md/.mdx into the editor
 │   ├── SlidesViewer.tsx                    # PDF and Google Slides embed
 │   ├── SlidesSection.tsx                   # Client boundary for slides viewer
 │   ├── CoursePageReadToggle.tsx            # Student read progress tracking
-│   ├── MafsGraph.tsx                      # Mafs graph renderer — used in editor and student view
-│   ├── MafsGraphEditor.tsx                # Instructor graph authoring modal with live preview
+│   ├── MafsGraph.tsx                      # Mafs graph renderer (ssr:false) — used in editor node view and lesson preview
+│   ├── MafsGraphEditor.tsx                # Instructor graph authoring modal — presets, function colours, viewport/step controls
+│   ├── LatexModal.tsx                       # LaTeX formula reference with editable field, live KaTeX preview, and category tabs
+│   ├── BakerversityLogo.tsx                 # Inline SVG logo, theme-aware via .logo-bg CSS class
 │   ├── MarkCompleteButton.tsx              # Lesson completion toggle
-│   ├── ModuleProgressBars.tsx              # Per-module progress bar UI
-│   ├── CourseProgressLoader.tsx            # Fetches and renders progress on course detail
-│   ├── CourseSettings.tsx                  # Modal for editing course title, slug, price, thumbnail
+│   ├── CourseSettings.tsx                  # Course settings modal — title, slug, price, thumbnail, intro/conclusion descriptions, per-course editor tools
 │   ├── EnrollSelfButton.tsx                # Instructor self-enrollment for testing
 │   └── DeleteButton.tsx                    # Reusable inline delete with confirm
 └── lib/
@@ -187,7 +185,6 @@ src/
 |---|---|
 | `/courses` | Course catalogue |
 | `/courses/[slug]` | Course detail and contents |
-| `/courses/[slug]/contents` | Table of contents |
 | `/courses/[slug]/[moduleSlug]/[lessonSlug]` | Lesson viewer (canonical) |
 | `/courses/[slug]/[moduleSlug]` | Module landing — redirects to first lesson |
 | `/courses/[slug]/lessons/[lessonSlug]` | Legacy lesson URL — redirects to canonical |
