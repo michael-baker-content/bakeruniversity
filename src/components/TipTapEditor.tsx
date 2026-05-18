@@ -82,7 +82,7 @@ const MafsGraphNode = Node.create({
     })]
   },
   addNodeView() {
-    return ReactNodeViewRenderer(MafsGraphNodeView as Parameters<typeof ReactNodeViewRenderer>[0])
+    return ReactNodeViewRenderer(MafsGraphNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
   },
 })
 
@@ -172,7 +172,7 @@ const TerminalNode = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-terminal': node.attrs.content })]
   },
   addNodeView() {
-    return ReactNodeViewRenderer(TerminalNodeView as Parameters<typeof ReactNodeViewRenderer>[0])
+    return ReactNodeViewRenderer(TerminalNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
   },
 })
 
