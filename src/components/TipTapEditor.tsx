@@ -557,7 +557,7 @@ export default function TipTapEditor({
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>" Quote</ToolbarButton>
           {/* Callout picker */}
           <div style={{ position: 'relative' }}>
-            <ToolbarButton onClick={() => setShowCalloutPicker((v) => !v)} active={showCalloutPicker} title="Insert callout block">
+            <ToolbarButton onClick={() => setShowCalloutPicker((v) => !v)} active={showCalloutPicker}>
               ✦ Callout
             </ToolbarButton>
             {showCalloutPicker && (
