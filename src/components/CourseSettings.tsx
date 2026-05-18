@@ -38,7 +38,7 @@ export default function CourseSettings({ courseId, title, description, slug, pri
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function set(field: string, value: string | number) {
+  function set(field: string, value: string | number | string[]) {
     setForm((f) => ({ ...f, [field]: value }))
     setSaved(false)
     setError('')
