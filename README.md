@@ -151,8 +151,16 @@ src/
 │   ├── SiteNavClient.tsx                   # Interactive nav — hamburger, theme toggle
 │   ├── ThemeProvider.tsx                   # next-themes wrapper
 │   ├── ThemeToggle.tsx                     # Light/dark mode toggle
-│   ├── TipTapEditor.tsx                    # Rich text editor — per-course packs: math, graph, code, terminal, python-lint, lang-select; callout blocks always available
-│   ├── LessonRenderer.tsx                  # Read-only renderer — handles code blocks (with syntax highlighting, line numbers, filename), terminal blocks, callouts, graphs, LaTeX
+│   ├── TipTapEditor.tsx                    # Rich text editor — thin orchestration layer (~195 lines); delegates to editor/ submodules
+│   ├── editor/
+│   │   ├── constants.ts                    # LANGUAGES, LANG_EXTENSIONS, CALLOUT_TYPES
+│   │   ├── nodes.ts                        # All TipTap node/extension definitions (math, graph, code, terminal, callout, python-lint)
+│   │   ├── NodeViews.tsx                   # React node view components (MafsGraphNodeView, TerminalNodeView, CalloutNodeView)
+│   │   └── Toolbar.tsx                     # Toolbar UI, terminal modal, and lint panel
+│   ├── LessonRenderer.tsx                  # Read-only renderer — thin orchestration layer (~52 lines); delegates to renderer/ submodules
+│   ├── renderer/
+│   │   ├── renderNode.ts                   # Pure node-to-HTML switch (code blocks, callouts, terminal, math, marks)
+│   │   └── HtmlSegment.tsx                 # React component — KaTeX and lowlight syntax highlighting via useEffect
 │   ├── LessonSidebar.tsx                   # Responsive sidebar — modules, pages, lessons
 │   ├── LessonList.tsx                      # Reorderable lesson list with module assignment
 │   ├── ContentRow.tsx                      # Course contents row (client, handles hover)
