@@ -64,7 +64,7 @@ export function Toolbar({
   return (
     <>
       {/* ── Toolbar row ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', background: 'var(--surface-2)' }}>
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>B</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>I</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')}>&lt;/&gt;</ToolbarButton>
@@ -111,6 +111,25 @@ export function Toolbar({
         <ToolbarButton onClick={onFileClick} active={false}>
           {uploading ? 'Uploading...' : '🖼 Image'}
         </ToolbarButton>
+
+        {/* Table insert + context controls */}
+        <div style={{ position: 'relative', display: 'inline-flex', gap: 4 }}>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+            active={false}
+          >
+            ⊞ Table
+          </ToolbarButton>
+          {editor.isActive('table') && (
+            <>
+              <ToolbarButton onClick={() => editor.chain().focus().addColumnAfter().run()} active={false}>+Col</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().addRowAfter().run()} active={false}>+Row</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().deleteColumn().run()} active={false}>−Col</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().deleteRow().run()} active={false}>−Row</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().deleteTable().run()} active={false}>✕ Table</ToolbarButton>
+            </>
+          )}
+        </div>
 
         {hasMath && <ToolbarButton onClick={() => onLatexButtonClick?.()} active={false}>∑ Formula</ToolbarButton>}
         {hasGraph && <ToolbarButton onClick={() => onGraphButtonClick?.()} active={false}>📈 Graph</ToolbarButton>}

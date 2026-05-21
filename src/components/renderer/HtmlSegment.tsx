@@ -15,12 +15,28 @@ export function HtmlSegment({ html }: { html: string }) {
 
     // KaTeX rendering
     ref.current.querySelectorAll<HTMLElement>('[data-inline-math]').forEach((el) => {
-      try { katex.render(el.dataset.inlineMath ?? '', el, { throwOnError: false, displayMode: false }) }
-      catch { /* ignore */ }
+      const latex = el.getAttribute('data-inline-math') ?? ''
+      let target = el.querySelector<HTMLElement>('.katex-render-target')
+      if (!target) {
+        target = document.createElement('span')
+        target.className = 'katex-render-target'
+        el.innerHTML = ''
+        el.appendChild(target)
+      }
+      try { katex.render(latex, target, { throwOnError: false, displayMode: false }) }
+      catch { target.textContent = latex }
     })
     ref.current.querySelectorAll<HTMLElement>('[data-block-math]').forEach((el) => {
-      try { katex.render(el.dataset.blockMath ?? '', el, { throwOnError: false, displayMode: true }) }
-      catch { /* ignore */ }
+      const latex = el.getAttribute('data-block-math') ?? ''
+      let target = el.querySelector<HTMLElement>('.katex-render-target')
+      if (!target) {
+        target = document.createElement('span')
+        target.className = 'katex-render-target'
+        el.innerHTML = ''
+        el.appendChild(target)
+      }
+      try { katex.render(latex, target, { throwOnError: false, displayMode: true }) }
+      catch { target.textContent = latex }
     })
 
     // Syntax highlighting + line numbers

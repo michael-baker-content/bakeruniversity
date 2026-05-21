@@ -1,7 +1,7 @@
 import { Node, Extension, mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { all, createLowlight } from 'lowlight'
-import { TerminalNodeView, MafsGraphNodeView, CalloutNodeView } from './NodeViews'
+import { TerminalNodeView, MafsGraphNodeView, CalloutNodeView, InlineMathNodeView, BlockMathNodeView } from './NodeViews'
 
 const lowlight = createLowlight(all)
 
@@ -16,6 +16,9 @@ export const InlineMath = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes, { 'data-inline-math': node.attrs.latex }), node.attrs.latex]
   },
+  addNodeView() {
+    return ReactNodeViewRenderer(InlineMathNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
+  },
 })
 
 export const BlockMath = Node.create({
@@ -26,6 +29,9 @@ export const BlockMath = Node.create({
   parseHTML() { return [{ tag: 'div[data-block-math]' }] },
   renderHTML({ node, HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, { 'data-block-math': node.attrs.latex }), node.attrs.latex]
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(BlockMathNodeView as unknown as Parameters<typeof ReactNodeViewRenderer>[0])
   },
 })
 

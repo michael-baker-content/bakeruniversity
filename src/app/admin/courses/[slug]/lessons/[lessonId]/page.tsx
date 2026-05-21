@@ -33,6 +33,7 @@ export default function EditLessonPage() {
   const insertFnRef = useRef<((doc: Record<string, unknown>) => void) | null>(null)
   const insertGraphRef = useRef<((attrs: MafsGraphAttrs) => void) | null>(null)
   const insertLatexRef = useRef<((latex: string, displayMode: boolean) => void) | null>(null)
+  const exportRef = useRef<((format: 'html' | 'markdown' | 'txt') => void) | null>(null)
   const [showGraphEditor, setShowGraphEditor] = useState(false)
   const [showLatexModal, setShowLatexModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -203,10 +204,15 @@ export default function EditLessonPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <label style={labelStyle}>Content</label>
-            <MarkdownImport
-              hasExistingContent={Object.keys(content).length > 0}
-              onInsert={(doc) => insertFnRef.current?.(doc)}
-            />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <MarkdownImport
+                hasExistingContent={Object.keys(content).length > 0}
+                onInsert={(doc) => insertFnRef.current?.(doc)}
+              />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('html')}>⬇ HTML</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('markdown')}>⬇ MD</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportRef.current?.('txt')}>⬇ TXT</button>
+            </div>
           </div>
           {ready && (
             <TipTapEditor
@@ -215,6 +221,7 @@ export default function EditLessonPage() {
               content={Object.keys(content).length > 0 ? content : undefined}
               onChange={setContent}
               onEditorReady={(fn) => { insertFnRef.current = fn }}
+              onExportReady={(fn) => { exportRef.current = fn }}
               onGraphButtonClick={() => setShowGraphEditor(true)}
               onInsertGraph={(fn) => { insertGraphRef.current = fn }}
               onLatexButtonClick={() => setShowLatexModal(true)}

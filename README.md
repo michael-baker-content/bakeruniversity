@@ -1,6 +1,6 @@
 # Bakerversity
 
-A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion. The lesson editor supports per-course configurable tool packs: LaTeX math, Mafs interactive graphs, syntax-highlighted code blocks with line numbers and filename labels, terminal/bash blocks, Python linting, language selector, and callout blocks (tip, info, warning, note, further reading, alert).
+A custom online course platform built with Next.js, Clerk, Supabase, and Stripe. Designed for rich instructional content — lessons with LaTeX math rendering, syntax-highlighted code, images, and PDF/Google Slides embeds. Includes a full quiz engine with multiple choice, true/false, and text response questions, instructor grading, a module system for organizing lesson sequences, student progress tracking, and certificate issuance on course completion. The lesson editor supports per-course configurable tool packs: LaTeX math (with double-click to edit formulas), Mafs interactive graphs, syntax-highlighted code blocks with line numbers and filename labels, terminal/bash blocks, Python linting, language selector, callout blocks (tip, info, warning, note, further reading, alert), and tables. The editor toolbar is sticky, supports HTML/Markdown/TXT export, and markdown input rules are disabled to avoid accidental formatting.
 
 ---
 
@@ -151,12 +151,12 @@ src/
 │   ├── SiteNavClient.tsx                   # Interactive nav — hamburger, theme toggle
 │   ├── ThemeProvider.tsx                   # next-themes wrapper
 │   ├── ThemeToggle.tsx                     # Light/dark mode toggle
-│   ├── TipTapEditor.tsx                    # Rich text editor — thin orchestration layer (~195 lines); delegates to editor/ submodules
+│   ├── TipTapEditor.tsx                    # Rich text editor — sticky toolbar, export, table support, LaTeX double-click edit
 │   ├── editor/
 │   │   ├── constants.ts                    # LANGUAGES, LANG_EXTENSIONS, CALLOUT_TYPES
-│   │   ├── nodes.ts                        # All TipTap node/extension definitions (math, graph, code, terminal, callout, python-lint)
-│   │   ├── NodeViews.tsx                   # React node view components (MafsGraphNodeView, TerminalNodeView, CalloutNodeView)
-│   │   └── Toolbar.tsx                     # Toolbar UI, terminal modal, and lint panel
+│   │   ├── nodes.ts                        # All TipTap node/extension definitions (math, graph, code, terminal, callout, python-lint, table)
+│   │   ├── NodeViews.tsx                   # React node view components including InlineMathNodeView, BlockMathNodeView (with double-click edit)
+│   │   └── Toolbar.tsx                     # Toolbar UI, terminal modal, lint panel, table controls
 │   ├── LessonRenderer.tsx                  # Read-only renderer — thin orchestration layer (~52 lines); delegates to renderer/ submodules
 │   ├── renderer/
 │   │   ├── renderNode.ts                   # Pure node-to-HTML switch (code blocks, callouts, terminal, math, marks)

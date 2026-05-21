@@ -194,12 +194,12 @@ export default function SiteNavClient({ active, isSignedIn, isAdmin }: SiteNavCl
       )}
 
       <style>{`
-        @media (max-width: 540px) {
+        @media (max-width: 720px) {
           .sitenav-desktop { display: none !important; }
           .sitenav-hamburger { display: flex !important; }
           .sitenav-signin { display: none !important; }
         }
-        @media (min-width: 541px) {
+        @media (min-width: 721px) {
           .sitenav-hamburger { display: none !important; }
         }
       `}</style>

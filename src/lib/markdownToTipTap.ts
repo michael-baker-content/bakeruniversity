@@ -164,6 +164,29 @@ function convertBlockNode(node: MdastNode): TipTapNode | null {
     case 'thematicBreak':
       return { type: 'horizontalRule' }
 
+    case 'table': {
+      const [headRow, ...bodyRows] = (node.children ?? []) as typeof node.children
+      const toCell = (cell: Record<string, unknown>, isHeader: boolean): TipTapNode => {
+        const cellChildren = (cell.children ?? []) as Record<string, unknown>[]
+        const inline = cellChildren.flatMap((n: Record<string, unknown>) => convertInlineNodes(n))
+        return {
+          type: isHeader ? 'tableHeader' : 'tableCell',
+          content: [{ type: 'paragraph', content: inline }],
+        }
+      }
+      const toRow = (row: Record<string, unknown>, isHeader: boolean): TipTapNode => ({
+        type: 'tableRow',
+        content: ((row.children ?? []) as Record<string, unknown>[]).map((cell) => toCell(cell, isHeader)),
+      })
+      return {
+        type: 'table',
+        content: [
+          ...(headRow ? [toRow(headRow as Record<string, unknown>, true)] : []),
+          ...((bodyRows ?? []) as Record<string, unknown>[]).map((row) => toRow(row, false)),
+        ],
+      }
+    }
+
     case 'image': {
       const src = sanitizeUrl(node.url ?? '')
       if (!src) return null

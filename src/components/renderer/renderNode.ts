@@ -102,6 +102,10 @@ export function renderNode(node: Record<string, unknown>): string {
       const alt = escapeAttr((attrs.alt as string) ?? '')
       return `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:0.5rem 0;display:block;" />`
     }
+    case 'table':     return `<table>${children}</table>`
+    case 'tableRow':  return `<tr>${children}</tr>`
+    case 'tableCell': return `<td>${children}</td>`
+    case 'tableHeader': return `<th>${children}</th>`
     case 'horizontalRule': return '<hr>'
     case 'hardBreak':      return '<br>'
     case 'text': {

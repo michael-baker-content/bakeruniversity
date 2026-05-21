@@ -1,10 +1,93 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
+import katex from 'katex'
 import MafsGraph from '@/components/MafsGraph'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
 import { CALLOUT_TYPES } from './constants'
+
+// ── Inline math node view ─────────────────────────────────────────────────────
+export function InlineMathNodeView({ node, selected, getPos, editor }: {
+  node: { attrs: { latex: string } }
+  selected: boolean
+  getPos: () => number | undefined
+  editor: import('@tiptap/react').Editor
+}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    try { katex.render(node.attrs.latex, ref.current, { throwOnError: false, displayMode: false }) }
+    catch { if (ref.current) ref.current.textContent = node.attrs.latex }
+  }, [node.attrs.latex])
+
+  return (
+    <NodeViewWrapper as="span" style={{ display: 'inline' }}>
+      <span
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 2,
+          cursor: 'pointer', borderRadius: 3,
+          outline: selected ? '2px solid var(--amber)' : 'none',
+          outlineOffset: 1,
+        }}
+        title="Double-click to edit formula"
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          const pos = getPos()
+          if (pos != null) {
+            editor.commands.setMeta('editingLatex', { latex: node.attrs.latex, displayMode: false, pos })
+          }
+        }}
+      >
+        <span ref={ref} />
+        {selected && (
+          <span style={{ fontSize: 9, color: 'var(--amber)', fontWeight: 700, padding: '0 2px' }}>✎</span>
+        )}
+      </span>
+    </NodeViewWrapper>
+  )
+}
+
+// ── Block math node view ──────────────────────────────────────────────────────
+export function BlockMathNodeView({ node, selected, getPos, editor }: {
+  node: { attrs: { latex: string } }
+  selected: boolean
+  getPos: () => number | undefined
+  editor: import('@tiptap/react').Editor
+}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    try { katex.render(node.attrs.latex, ref.current, { throwOnError: false, displayMode: true }) }
+    catch { if (ref.current) ref.current.textContent = node.attrs.latex }
+  }, [node.attrs.latex])
+
+  return (
+    <NodeViewWrapper>
+      <div
+        style={{
+          textAlign: 'center', margin: '1rem 0', cursor: 'pointer',
+          padding: '4px 8px', borderRadius: 4,
+          outline: selected ? '3px solid var(--amber)' : '2px solid transparent',
+          position: 'relative',
+        }}
+        title="Double-click to edit formula"
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          const pos = getPos()
+          if (pos != null) {
+            editor.commands.setMeta('editingLatex', { latex: node.attrs.latex, displayMode: true, pos })
+          }
+        }}
+      >
+        <span ref={ref} />
+        {selected && (
+          <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 10, color: 'var(--amber)', fontWeight: 700 }}>✎ edit</span>
+        )}
+      </div>
+    </NodeViewWrapper>
+  )
+}
 
 // ── Mafs graph node view ───────────────────────────────────────────────────────
 export function MafsGraphNodeView({ node, selected }: {

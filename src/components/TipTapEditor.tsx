@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, Extension } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import dynamic from 'next/dynamic'
 import type { MafsGraphAttrs } from '@/components/MafsGraph'
 import {
   InlineMath, BlockMath, MathShortcut,
@@ -14,6 +15,74 @@ import {
 } from './editor/nodes'
 import type { LintDiagnostic } from './editor/nodes'
 import { Toolbar } from './editor/Toolbar'
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+
+const LatexModal = dynamic(() => import('@/components/LatexModal'), { ssr: false })
+
+// ── JSON → Markdown converter ─────────────────────────────────────────────────
+function nodeToMd(node: Record<string, unknown>, indent = '', num?: number): string {
+  const type = node.type as string
+  const content = (node.content as Record<string, unknown>[] | undefined) ?? []
+  const attrs = (node.attrs as Record<string, unknown> | undefined) ?? {}
+  const children = () => content.map((n) => nodeToMd(n, indent)).join('')
+
+  switch (type) {
+    case 'doc':           return content.map((n) => nodeToMd(n)).join('\n')
+    case 'paragraph':     return children() ? `${children()}\n` : '\n'
+    case 'heading':       return `${'#'.repeat((attrs.level as number) ?? 2)} ${children()}\n`
+    case 'bulletList':    return content.map((n) => nodeToMd(n, indent)).join('') + '\n'
+    case 'orderedList':   return content.map((n, i) => nodeToMd(n, indent, i + 1)).join('') + '\n'
+    case 'listItem':
+      return num !== undefined
+        ? `${indent}${num}. ${content.map((n) => nodeToMd(n, indent + '   ')).join('').trimEnd()}\n`
+        : `${indent}- ${content.map((n) => nodeToMd(n, indent + '  ')).join('').trimEnd()}\n`
+    case 'blockquote':    return children().split('\n').map((l) => `> ${l}`).join('\n') + '\n'
+    case 'codeBlock': {
+      const lang = (attrs.language as string) ?? ''
+      return `\`\`\`${lang}\n${children()}\n\`\`\`\n`
+    }
+    case 'table': {
+      const rows = content.map((n) => nodeToMd(n, indent))
+      // Insert separator row after header
+      if (rows.length > 0) {
+        const headerCols = (content[0].content as Record<string, unknown>[] | undefined)?.length ?? 1
+        rows.splice(1, 0, '|' + ' --- |'.repeat(headerCols))
+      }
+      return rows.join('\n') + '\n'
+    }
+    case 'tableRow':    return '| ' + content.map((n) => nodeToMd(n, indent)).join(' | ') + ' |\n'
+    case 'tableCell':
+    case 'tableHeader': return children().replace(/\n/g, ' ').trim()
+    case 'horizontalRule': return '---\n'
+    case 'hardBreak':      return '  \n'
+    case 'inlineMath':     return `$${attrs.latex ?? ''}$`
+    case 'blockMath':      return `$$\n${attrs.latex ?? ''}\n$$\n`
+    case 'terminalBlock':  return `\`\`\`bash\n${attrs.content ?? ''}\n\`\`\`\n`
+    case 'callout': {
+      const label = (attrs.type as string) ?? 'note'
+      return `> **${label.toUpperCase()}**: ${attrs.content ?? ''}\n`
+    }
+    case 'text': {
+      const marks = (node.marks as { type: string }[]) ?? []
+      let t = (node.text as string) ?? ''
+      if (marks.some((m) => m.type === 'bold'))   t = `**${t}**`
+      if (marks.some((m) => m.type === 'italic')) t = `*${t}*`
+      if (marks.some((m) => m.type === 'code'))   t = `\`${t}\``
+      return t
+    }
+    default: return children()
+  }
+}
+
+function jsonToMarkdown(doc: Record<string, unknown>): string {
+  return nodeToMd(doc).replace(/\n{3,}/g, '\n\n').trim()
+}
+
+// Disables all markdown input rules (**, *, #, ---, etc.)
+const NoInputRules = Extension.create({
+  name: 'noInputRules',
+  addInputRules() { return [] },
+})
 
 export type EditorPack = 'math' | 'code' | 'graph' | 'python-lint' | 'terminal' | 'lang-select'
 
@@ -23,6 +92,7 @@ interface TipTapEditorProps {
   editable?: boolean
   packs?: EditorPack[]
   onEditorReady?: (insert: (doc: Record<string, unknown>) => void) => void
+  onExportReady?: (exportFn: (format: 'html' | 'markdown' | 'txt') => void) => void
   onGraphButtonClick?: () => void
   onInsertGraph?: (insert: (attrs: MafsGraphAttrs) => void) => void
   onLatexButtonClick?: () => void
@@ -35,6 +105,7 @@ export default function TipTapEditor({
   editable = true,
   packs = ['math', 'code'],
   onEditorReady,
+  onExportReady,
   onGraphButtonClick,
   onInsertGraph,
   onLatexButtonClick,
@@ -49,6 +120,8 @@ export default function TipTapEditor({
   const [terminalContent, setTerminalContent]   = useState('$ ')
   const [filenameInput, setFilenameInput]        = useState('')
   const [showCalloutPicker, setShowCalloutPicker] = useState(false)
+  // Latex editing — null = inserting new, object = editing existing node
+  const [editingLatex, setEditingLatex] = useState<{ latex: string; displayMode: boolean; pos: number } | null>(null)
 
   const hasMath       = packs.includes('math')
   const hasCode       = packs.includes('code')
@@ -59,8 +132,13 @@ export default function TipTapEditor({
   // ── Extensions ─────────────────────────────────────────────────────────────
   const extensions = [
     StarterKit.configure({ codeBlock: false }),
+    NoInputRules,
     Image.configure({ inline: false, allowBase64: false }),
     CalloutNode,
+    Table.configure({ resizable: false, HTMLAttributes: { style: 'width: auto; min-width: 0;' } }),
+    TableRow,
+    TableCell,
+    TableHeader,
     ...(hasCode       ? [ExtendedCodeBlock]                  : []),
     ...(hasMath       ? [InlineMath, BlockMath, MathShortcut] : []),
     ...(hasGraph      ? [MafsGraphNode]                      : []),
@@ -82,6 +160,30 @@ export default function TipTapEditor({
     onUpdate: ({ editor }) => {
       onChange?.(editor.getJSON() as Record<string, unknown>)
     },
+    editorProps: {
+      handleDOMEvents: {
+        dblclick: (view, event) => {
+          if (!hasMath) return false
+          const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })
+          if (!pos) return false
+          const node = view.state.doc.nodeAt(pos.pos)
+          if (!node) {
+            // Try one position back (cursor may be after the node)
+            const nodeBefore = view.state.doc.nodeAt(pos.pos - 1)
+            if (nodeBefore && (nodeBefore.type.name === 'inlineMath' || nodeBefore.type.name === 'blockMath')) {
+              setEditingLatex({ latex: nodeBefore.attrs.latex, displayMode: nodeBefore.type.name === 'blockMath', pos: pos.pos - 1 })
+              return true
+            }
+            return false
+          }
+          if (node.type.name === 'inlineMath' || node.type.name === 'blockMath') {
+            setEditingLatex({ latex: node.attrs.latex, displayMode: node.type.name === 'blockMath', pos: pos.pos })
+            return true
+          }
+          return false
+        },
+      },
+    },
   })
 
   // ── Expose insert-content to parent ────────────────────────────────────────
@@ -95,18 +197,18 @@ export default function TipTapEditor({
     })
   }, [editor, onEditorReady])
 
-  // ── Render KaTeX ───────────────────────────────────────────────────────────
+  // ── Listen for editingLatex meta from math node views ─────────────────────
   useEffect(() => {
-    if (!hasMath || !editorRef.current) return
-    editorRef.current.querySelectorAll<HTMLElement>('[data-inline-math]').forEach((el) => {
-      try { katex.render(el.dataset.inlineMath ?? '', el, { throwOnError: false, displayMode: false }) }
-      catch { /* ignore */ }
+    if (!editor || !hasMath) return
+    const update = () => {
+      const meta = editor.state.tr.getMeta('editingLatex')
+      if (meta) setEditingLatex(meta)
+    }
+    editor.on('transaction', ({ transaction }) => {
+      const meta = transaction.getMeta('editingLatex')
+      if (meta) setEditingLatex(meta)
     })
-    editorRef.current.querySelectorAll<HTMLElement>('[data-block-math]').forEach((el) => {
-      try { katex.render(el.dataset.blockMath ?? '', el, { throwOnError: false, displayMode: true }) }
-      catch { /* ignore */ }
-    })
-  })
+  }, [editor, hasMath])
 
   // ── Image upload ───────────────────────────────────────────────────────────
   const handleImageUpload = useCallback(async (file: File) => {
@@ -173,9 +275,27 @@ export default function TipTapEditor({
 
   useEffect(() => { onInsertGraph?.(insertGraph) }, [insertGraph, onInsertGraph])
 
+  // ── Export ────────────────────────────────────────────────────────────────
+  const exportAs = useCallback((format: 'html' | 'markdown' | 'txt') => {
+    if (!editor) return
+    let content: string
+    if (format === 'html') content = editor.getHTML()
+    else if (format === 'txt') content = editor.getText()
+    else content = jsonToMarkdown(editor.getJSON() as Record<string, unknown>)
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = format === 'html' ? 'lesson.html' : format === 'txt' ? 'lesson.txt' : 'lesson.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [editor])
+
+  useEffect(() => { onExportReady?.(exportAs) }, [exportAs, onExportReady])
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--surface)' }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'visible', background: 'var(--surface)', position: 'relative' }}>
       {editable && editor && (
         <>
           <input
@@ -190,24 +310,26 @@ export default function TipTapEditor({
               e.target.value = ''
             }}
           />
-          <Toolbar
-            editor={editor}
-            packs={packs}
-            uploading={uploading}
-            showCalloutPicker={showCalloutPicker}
-            showTerminalModal={showTerminalModal}
-            terminalContent={terminalContent}
-            filenameInput={filenameInput}
-            lintDiagnostics={lintDiagnostics}
-            onFileClick={() => fileInputRef.current?.click()}
-            onLatexButtonClick={onLatexButtonClick}
-            onGraphButtonClick={onGraphButtonClick}
-            onInsertTerminal={insertTerminal}
-            setShowCalloutPicker={setShowCalloutPicker}
-            setShowTerminalModal={setShowTerminalModal}
-            setTerminalContent={setTerminalContent}
-            setFilenameInput={setFilenameInput}
-          />
+          <div style={{ position: 'sticky', top: 52, zIndex: 10, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', borderRadius: 'var(--radius) var(--radius) 0 0' }}>
+            <Toolbar
+              editor={editor}
+              packs={packs}
+              uploading={uploading}
+              showCalloutPicker={showCalloutPicker}
+              showTerminalModal={showTerminalModal}
+              terminalContent={terminalContent}
+              filenameInput={filenameInput}
+              lintDiagnostics={lintDiagnostics}
+              onFileClick={() => fileInputRef.current?.click()}
+              onLatexButtonClick={onLatexButtonClick}
+              onGraphButtonClick={onGraphButtonClick}
+              onInsertTerminal={insertTerminal}
+              setShowCalloutPicker={setShowCalloutPicker}
+              setShowTerminalModal={setShowTerminalModal}
+              setTerminalContent={setTerminalContent}
+              setFilenameInput={setFilenameInput}
+            />
+          </div>
         </>
       )}
       <div
@@ -217,6 +339,32 @@ export default function TipTapEditor({
       >
         <EditorContent editor={editor} style={{ padding: '1rem', fontSize: 15, lineHeight: 1.7 }} />
       </div>
+
+      {/* LaTeX edit modal — triggered by double-clicking a formula */}
+      {editingLatex && (
+        <LatexModal
+          initialLatex={editingLatex.latex}
+          initialDisplayMode={editingLatex.displayMode}
+          showDisplayToggle
+          onInsert={(latex, displayMode) => {
+            if (!editor) return
+            const pos = editingLatex.pos
+            const node = editor.state.doc.nodeAt(pos)
+            if (node) {
+              editor.chain()
+                .deleteRange({ from: pos, to: pos + node.nodeSize })
+                .insertContentAt(pos, {
+                  type: displayMode ? 'blockMath' : 'inlineMath',
+                  attrs: { latex },
+                })
+                .run()
+            }
+            setEditingLatex(null)
+          }}
+          onClose={() => setEditingLatex(null)}
+        />
+      )}
+
       <style>{`
         .tiptap:focus { outline: none; }
         .tiptap h2 { font-size: 1.4rem; margin: 1.5rem 0 0.5rem; }
@@ -235,6 +383,10 @@ export default function TipTapEditor({
         .tiptap img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5rem 0; display: block; }
         .tiptap img.ProseMirror-selectednode { outline: 3px solid var(--amber); }
         .tiptap [data-terminal] { font-family: monospace; }
+        .tiptap table { border-collapse: collapse; width: auto; min-width: 120px; margin: 1rem 0; }
+        .tiptap th, .tiptap td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 14px; }
+        .tiptap th { background: var(--surface-2); font-weight: 600; }
+        .tiptap .selectedCell { background: var(--indigo-muted); }
         .tiptap pre[data-terminal-pre] { color: #e6edf3 !important; background: none !important; border: none !important; padding: 0 !important; }
         .tiptap .ProseMirror-selectednode [data-terminal-inner] { outline: 3px solid var(--amber); }
       `}</style>

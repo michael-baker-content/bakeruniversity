@@ -77,14 +77,18 @@ export default function LatexModal({
   onInsert,
   onClose,
   showDisplayToggle = false,
+  initialLatex = '',
+  initialDisplayMode = false,
 }: {
   onInsert: (latex: string, displayMode: boolean) => void
   onClose: () => void
   showDisplayToggle?: boolean
+  initialLatex?: string
+  initialDisplayMode?: boolean
 }) {
   const [activeCategory, setActiveCategory] = useState(0)
-  const [displayMode, setDisplayMode] = useState(false)
-  const [editableLatex, setEditableLatex] = useState('')
+  const [displayMode, setDisplayMode] = useState(initialDisplayMode)
+  const [editableLatex, setEditableLatex] = useState(initialLatex)
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewError, setPreviewError] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
