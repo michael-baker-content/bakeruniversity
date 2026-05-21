@@ -165,10 +165,11 @@ function convertBlockNode(node: MdastNode): TipTapNode | null {
       return { type: 'horizontalRule' }
 
     case 'table': {
-      const [headRow, ...bodyRows] = (node.children ?? []) as typeof node.children
+      const rows = ((node.children ?? []) as Record<string, unknown>[])
+      const [headRow, ...bodyRows] = rows
       const toCell = (cell: Record<string, unknown>, isHeader: boolean): TipTapNode => {
         const cellChildren = (cell.children ?? []) as Record<string, unknown>[]
-        const inline = cellChildren.flatMap((n: Record<string, unknown>) => convertInlineNodes(n))
+        const inline = convertInlineNodes(cellChildren as unknown as MdastNode[])
         return {
           type: isHeader ? 'tableHeader' : 'tableCell',
           content: [{ type: 'paragraph', content: inline }],
